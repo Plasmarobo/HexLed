@@ -104,23 +104,23 @@ int main(void)
   MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
   // Initialize DMAData to impossible values for initial conversion detection
-  DMAData.driveTemp = 0xffff;
-  DMAData.motorTemp = 0xffff;
-  DMAData.framefault = 0xffff;
-  DMAData.mcuTemp = 0xffff;
-  DMAData.Vref = 0xffff;
-  DMAData.busI = 0xffff;
+    DMAData.driveTemp = 0xffff;
+    DMAData.motorTemp = 0xffff;
+    DMAData.framefault = 0xffff;
+    DMAData.mcuTemp = 0xffff;
+    DMAData.Vref = 0xffff;
+    DMAData.busI = 0xffff;
 
 #ifdef DEBUG
-  // Enable DAC for debugging
-  DAC1->CR |= (DAC_CR_EN1 | DAC_CR_EN2);
+    // Enable DAC for debugging
+    DAC1->CR |= (DAC_CR_EN1 | DAC_CR_EN2);
 #endif
 
-  // Configure debug registers
-  DBGMCU->APB2FZR  |= DBGMCU_APB2FZR_DBG_TIM1_STOP;   // disable PWM outputs on debug stop
-  DBGMCU->APB1FZR1 |= DBGMCU_APB1FZR1_DBG_TIM2_STOP;  // freeze TIM2 on debug stop
-  DBGMCU->APB1FZR1 |= DBGMCU_APB1FZR1_DBG_TIM6_STOP;  // freeze TIM6 on debug stop
-  DBGMCU->APB1FZR1 |= DBGMCU_APB1FZR1_DBG_TIM7_STOP;  // freeze TIM7 on debug stop
+    // Configure debug registers
+    DBGMCU->APB2FZR  |= DBGMCU_APB2FZR_DBG_TIM1_STOP;   // disable PWM outputs on debug stop
+    DBGMCU->APB1FZR1 |= DBGMCU_APB1FZR1_DBG_TIM2_STOP;  // freeze TIM2 on debug stop
+    DBGMCU->APB1FZR1 |= DBGMCU_APB1FZR1_DBG_TIM6_STOP;  // freeze TIM6 on debug stop
+    DBGMCU->APB1FZR1 |= DBGMCU_APB1FZR1_DBG_TIM7_STOP;  // freeze TIM7 on debug stop
   /* USER CODE END 2 */
 
   /* Init scheduler */

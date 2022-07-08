@@ -42,6 +42,25 @@ void MX_I2C1_Init(void);
 void MX_I2C2_Init(void);
 
 /* USER CODE BEGIN Prototypes */
+typedef enum
+{
+    I2C_REQUEST = 1,
+    I2C_SUCCESS = 0,
+    I2C_ERROR_UNKNOWN = -1,
+    I2C_ERROR_TIMEOUT = -2,
+    I2C_ERROR_BUSY = -3,
+    I2C_RESET = -4,
+}
+i2c_status_t;
+
+typedef void (*i2c_callback_t)(int status, uint8_t* rx_data, int rx_length);
+
+// Initializes the I2C driver
+void i2c_init(void);
+// Sends a command and processes the reply
+i2c_status_t i2c_send(uint8_t* tx_buffer, uint16_t tx_size, i2c_callback_t cb);
+// Sets callback used to parse incoming commands
+i2c_status_t i2c_listen(i2c_callback_t cb);
 
 /* USER CODE END Prototypes */
 

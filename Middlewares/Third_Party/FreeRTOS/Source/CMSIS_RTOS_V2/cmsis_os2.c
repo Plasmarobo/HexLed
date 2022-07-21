@@ -1,5 +1,5 @@
 /* --------------------------------------------------------------------------
- * Portions Copyright © 2019 STMicroelectronics International N.V. All rights reserved.
+ * Portions Copyright ï¿½ 2019 STMicroelectronics International N.V. All rights reserved.
  * Copyright (c) 2013-2019 Arm Limited. All rights reserved.
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -21,6 +21,7 @@
  *
  *---------------------------------------------------------------------------*/
 
+#include <assert.h>
 #include <string.h>
 
 #include "cmsis_os2.h"                  // ::CMSIS:RTOS2
@@ -451,17 +452,9 @@ osThreadId_t osThreadNew (osThreadFunc_t func, void *argument, const osThreadAtt
       mem = 0;
     }
 
-    if (mem == 1) {
-      hTask = xTaskCreateStatic ((TaskFunction_t)func, name, stack, argument, prio, (StackType_t  *)attr->stack_mem,
+    assert(mem == 1);
+    hTask = xTaskCreateStatic ((TaskFunction_t)func, name, stack, argument, prio, (StackType_t  *)attr->stack_mem,
                                                                                     (StaticTask_t *)attr->cb_mem);
-    }
-    else {
-      if (mem == 0) {
-        if (xTaskCreate ((TaskFunction_t)func, name, (uint16_t)stack, argument, prio, &hTask) != pdPASS) {
-          hTask = NULL;
-        }
-      }
-    }
   }
 
   return ((osThreadId_t)hTask);
@@ -931,14 +924,8 @@ osTimerId_t osTimerNew (osTimerFunc_t func, osTimerType_t type, void *argument, 
         mem = 0;
       }
 
-      if (mem == 1) {
-        hTimer = xTimerCreateStatic (name, 1, reload, callb, TimerCallback, (StaticTimer_t *)attr->cb_mem);
-      }
-      else {
-        if (mem == 0) {
-          hTimer = xTimerCreate (name, 1, reload, callb, TimerCallback);
-        }
-      }
+      assert(mem == 1);
+      hTimer = xTimerCreateStatic (name, 1, reload, callb, TimerCallback, (StaticTimer_t *)attr->cb_mem);
     }
   }
 
@@ -1072,14 +1059,8 @@ osEventFlagsId_t osEventFlagsNew (const osEventFlagsAttr_t *attr) {
       mem = 0;
     }
 
-    if (mem == 1) {
-      hEventGroup = xEventGroupCreateStatic (attr->cb_mem);
-    }
-    else {
-      if (mem == 0) {
-        hEventGroup = xEventGroupCreate();
-      }
-    }
+    assert(mem == 1);
+    hEventGroup = xEventGroupCreateStatic (attr->cb_mem);
   }
 
   return ((osEventFlagsId_t)hEventGroup);
@@ -1263,22 +1244,12 @@ osMutexId_t osMutexNew (const osMutexAttr_t *attr) {
         mem = 0;
       }
 
-      if (mem == 1) {
-        if (rmtx != 0U) {
-          hMutex = xSemaphoreCreateRecursiveMutexStatic (attr->cb_mem);
-        }
-        else {
-          hMutex = xSemaphoreCreateMutexStatic (attr->cb_mem);
-        }
+      assert(mem == 1);
+      if (rmtx != 0U) {
+        hMutex = xSemaphoreCreateRecursiveMutexStatic (attr->cb_mem);
       }
       else {
-        if (mem == 0) {
-          if (rmtx != 0U) {
-            hMutex = xSemaphoreCreateRecursiveMutex ();
-          } else {
-            hMutex = xSemaphoreCreateMutex ();
-          }
-        }
+        hMutex = xSemaphoreCreateMutexStatic (attr->cb_mem);
       }
 
       #if (configQUEUE_REGISTRY_SIZE > 0)
@@ -1447,13 +1418,9 @@ osSemaphoreId_t osSemaphoreNew (uint32_t max_count, uint32_t initial_count, cons
 
     if (mem != -1) {
       if (max_count == 1U) {
-        if (mem == 1) {
-          hSemaphore = xSemaphoreCreateBinaryStatic ((StaticSemaphore_t *)attr->cb_mem);
-        }
-        else {
-          hSemaphore = xSemaphoreCreateBinary();
-        }
-
+        assert(mem == 1);
+        hSemaphore = xSemaphoreCreateBinaryStatic ((StaticSemaphore_t *)attr->cb_mem);
+        
         if ((hSemaphore != NULL) && (initial_count != 0U)) {
           if (xSemaphoreGive (hSemaphore) != pdPASS) {
             vSemaphoreDelete (hSemaphore);
@@ -1462,12 +1429,8 @@ osSemaphoreId_t osSemaphoreNew (uint32_t max_count, uint32_t initial_count, cons
         }
       }
       else {
-        if (mem == 1) {
-          hSemaphore = xSemaphoreCreateCountingStatic (max_count, initial_count, (StaticSemaphore_t *)attr->cb_mem);
-        }
-        else {
-          hSemaphore = xSemaphoreCreateCounting (max_count, initial_count);
-        }
+        assert(mem == 1);
+        hSemaphore = xSemaphoreCreateCountingStatic (max_count, initial_count, (StaticSemaphore_t *)attr->cb_mem);
       }
       
       #if (configQUEUE_REGISTRY_SIZE > 0)
@@ -1623,14 +1586,9 @@ osMessageQueueId_t osMessageQueueNew (uint32_t msg_count, uint32_t msg_size, con
       mem = 0;
     }
 
-    if (mem == 1) {
-      hQueue = xQueueCreateStatic (msg_count, msg_size, attr->mq_mem, attr->cb_mem);
-    }
-    else {
-      if (mem == 0) {
-        hQueue = xQueueCreate (msg_count, msg_size);
-      }
-    }
+    assert(mem == 1);
+    hQueue = xQueueCreateStatic (msg_count, msg_size, attr->mq_mem, attr->cb_mem);
+   
 
     #if (configQUEUE_REGISTRY_SIZE > 0)
     if (hQueue != NULL) {

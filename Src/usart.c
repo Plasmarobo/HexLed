@@ -20,11 +20,51 @@
 /* Includes ------------------------------------------------------------------*/
 #include "usart.h"
 
+#include "FreeRTOS.h"
+#include "task.h"
+#include "queue.h"
+
+#include <string.h>
+
 /* USER CODE BEGIN 0 */
+#define UART_TASK_STACK_SIZE (configMINIMAL_STACK_SIZE * 8)
+#define UART_TASK_PRIORITY (4)
+// 63 characters + null terminator
 
 /* USER CODE END 0 */
 
 UART_HandleTypeDef huart1;
+
+static StaticQueue_t message_queue_impl;
+uint8_t message_queue_buffer[MAX_MESSAGE_CONTENT_LENGTH * MAX_MESSAGE_QUEUE_LENGTH];
+static QueueHandle_t message_queue;
+
+static StackType_t stack_buffer[UART_TASK_STACK_SIZE];
+static StaticTask_t tcb_buffer;
+static TaskHandle_t uart_task;
+
+void uart_task_handler(void* args)
+{
+  char message[MAX_MESSAGE_CONTENT_LENGTH];
+  uint16_t bytes_to_send;
+  for(;;)
+  {
+    xQueueReceive(message_queue,
+                  &message,
+                  portMAX_DELAY);
+    bytes_to_send = strlen(message);
+    if (bytes_to_send > MAX_MESSAGE_CONTENT_LENGTH)
+    {
+      bytes_to_send = MAX_MESSAGE_CONTENT_LENGTH;
+    }
+    if (HAL_OK != HAL_UART_Transmit_IT(&huart1, (uint8_t*)message, bytes_to_send))
+    {
+      // An error sending has occured, drop message and return
+      // TODO: Notify... someone
+    }
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+  }
+}
 
 /* USART1 init function */
 
@@ -53,7 +93,18 @@ void MX_USART1_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART1_Init 2 */
+  message_queue = xQueueCreateStatic(MAX_MESSAGE_QUEUE_LENGTH,
+                                     MAX_MESSAGE_CONTENT_LENGTH,
+                                     message_queue_buffer,
+                                     &message_queue_impl);
 
+  uart_task = xTaskCreateStatic(uart_task_handler,
+                                "uart_task",
+                                UART_TASK_STACK_SIZE,
+                                NULL,
+                                UART_TASK_PRIORITY,
+                                stack_buffer,
+                                &tcb_buffer);
   /* USER CODE END USART1_Init 2 */
 
 }
@@ -85,9 +136,9 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     /* USART1 interrupt Init */
     HAL_NVIC_SetPriority(USART1_IRQn, 3, 0);
     HAL_NVIC_EnableIRQ(USART1_IRQn);
-  /* USER CODE BEGIN USART1_MspInit 1 */
-
-  /* USER CODE END USART1_MspInit 1 */
+    /* USER CODE BEGIN USART1_MspInit 1 */
+    
+    /* USER CODE END USART1_MspInit 1 */
   }
 }
 
@@ -117,7 +168,30 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 }
 
 /* USER CODE BEGIN 1 */
+/**
+  * @brief This function handles USART1 global interrupt / USART1 wake-up interrupt through EXTI line 25.
+  */
+void USART1_IRQHandler(void)
+{
+  /* USER CODE BEGIN USART1_IRQn 0 */
 
+  /* USER CODE END USART1_IRQn 0 */
+  HAL_UART_IRQHandler(&huart1);
+  /* USER CODE BEGIN USART1_IRQn 1 */
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+  xTaskNotifyFromISR(uart_task, 0, eNoAction, &xHigherPriorityTaskWoken);
+
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+  /* USER CODE END USART1_IRQn 1 */
+}
+
+void send_message(const char* message)
+{
+  xQueueSendToBack(message_queue,
+                   message,
+                   pdMS_TO_TICKS(100));
+}
 /* USER CODE END 1 */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

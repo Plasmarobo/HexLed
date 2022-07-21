@@ -41,21 +41,19 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define DEFAULT_TASK_STACK_SIZE (32)
+// Idle priority
+#define DEFAULT_TASK_PRIORITY (1)
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
+static StackType_t stack_buffer[DEFAULT_TASK_STACK_SIZE];
+static StaticTask_t tcb_buffer;
+static TaskHandle_t default_task;
 
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
-osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 
@@ -93,7 +91,15 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the thread(s) */
   /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  default_task = xTaskCreateStatic(StartDefaultTask,
+                                        "defaultTask",
+                                        DEFAULT_TASK_STACK_SIZE,
+                                        NULL,
+                                        DEFAULT_TASK_PRIORITY,
+                                        stack_buffer,
+                                        &tcb_buffer);
+
+  vTaskStartScheduler();
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -118,7 +124,7 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    vTaskDelay(pdMS_TO_TICKS(100UL));
   }
   /* USER CODE END StartDefaultTask */
 }

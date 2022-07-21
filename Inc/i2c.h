@@ -28,7 +28,7 @@ extern "C" {
 #include "main.h"
 
 /* USER CODE BEGIN Includes */
-
+#include "opt_prototypes.h"
 /* USER CODE END Includes */
 
 extern I2C_HandleTypeDef hi2c1;
@@ -40,9 +40,15 @@ extern I2C_HandleTypeDef hi2c2;
 
 void MX_I2C1_Init(void);
 void MX_I2C2_Init(void);
+void I2C1_EV_IRQHandler(void);
+void I2C1_ER_IRQHandler(void);
 
 /* USER CODE BEGIN Prototypes */
+void i2c1_send(uint8_t address, uint8_t* buffer, uint32_t length, opt_callback_t cb);
+void i2c2_send(uint8_t address, uint8_t* buffer, uint32_t length, opt_callback_t cb);
 
+void i2c1_recieve(uint8_t* buffer, uint32_t max_length, opt_callback_t cb);
+void i2c1_recieve(uint8_t* buffer, uint32_t max_length, opt_callback_t cb);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

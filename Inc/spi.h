@@ -28,7 +28,7 @@ extern "C" {
 #include "main.h"
 
 /* USER CODE BEGIN Includes */
-
+#include "opt_prototypes.h"
 /* USER CODE END Includes */
 
 extern SPI_HandleTypeDef hspi2;
@@ -40,6 +40,8 @@ extern SPI_HandleTypeDef hspi2;
 void MX_SPI2_Init(void);
 
 /* USER CODE BEGIN Prototypes */
+
+void spi2_send(uint8_t *buffer, uint32_t length, opt_callback_t cb);
 
 /* USER CODE END Prototypes */
 

@@ -20,11 +20,18 @@
 /* Includes ------------------------------------------------------------------*/
 #include "iwdg.h"
 
+#include "FreeRTOS.h"
+#include "timers.h"
+
 /* USER CODE BEGIN 0 */
+
+static void reload_watchdog(TimerHandle_t tm);
 
 /* USER CODE END 0 */
 
 IWDG_HandleTypeDef hiwdg;
+TimerHandle_t watchdog_timer_id;
+StaticTimer_t watchdog_timer;
 
 /* IWDG init function */
 void MX_IWDG_Init(void)
@@ -35,24 +42,50 @@ void MX_IWDG_Init(void)
   /* USER CODE END IWDG_Init 0 */
 
   /* USER CODE BEGIN IWDG_Init 1 */
-
+	if( (RCC->CSR & RCC_CSR_WWDGRSTF) != 0)
+  {
+		// TODO: Note the reset
+		RCC->CSR = RCC->CSR | RCC_CSR_RMVF;
+	}
+	
   /* USER CODE END IWDG_Init 1 */
   hiwdg.Instance = IWDG;
-  hiwdg.Init.Prescaler = IWDG_PRESCALER_4;
-  hiwdg.Init.Window = 4095;
-  hiwdg.Init.Reload = 4095;
+  // Aproximately 500ms for watchdog timeout
+  hiwdg.Init.Prescaler = IWDG_PRESCALER_32;
+  hiwdg.Init.Window = 4095; // Windowed mode disabled
+  hiwdg.Init.Reload = 4095; 
   if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
   {
     Error_Handler();
   }
   /* USER CODE BEGIN IWDG_Init 2 */
 
+  // Start a thread to pet the watchdog
+  
+  watchdog_timer_id = xTimerCreateStatic(
+    "watchdog_timer",
+    pdMS_TO_TICKS(1000),
+    pdTRUE,
+    0,
+    reload_watchdog,
+    &watchdog_timer);
+
+  if (NULL != watchdog_timer_id)
+  {
+    xTimerStart(watchdog_timer_id,
+                pdMS_TO_TICKS(0));
+  }
+
   /* USER CODE END IWDG_Init 2 */
 
 }
 
 /* USER CODE BEGIN 1 */
-
+static void reload_watchdog(TimerHandle_t tm)
+{
+  UNUSED(tm);
+	HAL_IWDG_Refresh(&hiwdg);
+}
 /* USER CODE END 1 */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

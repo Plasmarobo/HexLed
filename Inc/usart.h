@@ -34,13 +34,22 @@ extern "C" {
 extern UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN Private defines */
-
+#define MAX_MESSAGE_CONTENT_LENGTH (64)
+#define MAX_MESSAGE_QUEUE_LENGTH (4)
 /* USER CODE END Private defines */
 
 void MX_USART1_UART_Init(void);
 
 /* USER CODE BEGIN Prototypes */
-
+/**
+ * @brief A call to request data be sent over the uart
+ * 
+ * @param msg Content of the string
+ * @param length Length of the string
+ * 
+ * @note May block if the UART is busy
+ */
+void send_message(const char* msg);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

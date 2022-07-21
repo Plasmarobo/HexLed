@@ -19,7 +19,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "cmsis_os.h"
+#include "FreeRTOS.h"
 #include "dma.h"
 #include "i2c.h"
 #include "iwdg.h"
@@ -28,6 +28,14 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
+#include "timers.h"
+#include "display.h"
+#include "reset_info.h"
+
+#include <assert.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -41,6 +49,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -51,6 +62,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+static char message_buffer[MAX_MESSAGE_CONTENT_LENGTH];
 
 /* USER CODE END PV */
 
@@ -73,7 +85,7 @@ void MX_FREERTOS_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+  reset_cause_t reset_cause = reset_cause_get();
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -90,6 +102,15 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
 
+  // Configure debug registers
+  DBGMCU->APB2FZ |= DBGMCU_APB2_FZ_DBG_TIM21_STOP;   // disable PWM outputs on debug stop
+  DBGMCU->APB2FZ |= DBGMCU_APB2_FZ_DBG_TIM22_STOP;
+  DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_TIM2_STOP;  // freeze TIM2 on debug stop
+  DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_LPTIMER_STOP;  // freeze TIM6 on debug stop
+  DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_RTC_STOP;  // freeze TIM7 on debug stop
+  
+  __HAL_RCC_DBGMCU_CLK_ENABLE();
+  __HAL_DBGMCU_FREEZE_IWDG();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -103,31 +124,16 @@ int main(void)
   MX_TIM22_Init();
   MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
-  // Initialize DMAData to impossible values for initial conversion detection
-  DMAData.driveTemp = 0xffff;
-  DMAData.motorTemp = 0xffff;
-  DMAData.framefault = 0xffff;
-  DMAData.mcuTemp = 0xffff;
-  DMAData.Vref = 0xffff;
-  DMAData.busI = 0xffff;
 
-#ifdef DEBUG
-  // Enable DAC for debugging
-  DAC1->CR |= (DAC_CR_EN1 | DAC_CR_EN2);
-#endif
+  memset(message_buffer, '\0', MAX_MESSAGE_CONTENT_LENGTH);
+  snprintf(message_buffer, MAX_MESSAGE_CONTENT_LENGTH, "The system reset cause is \"%s\"\r\n", reset_cause_get_name(reset_cause));
+  send_message(message_buffer);
 
-  // Configure debug registers
-  DBGMCU->APB2FZR  |= DBGMCU_APB2FZR_DBG_TIM1_STOP;   // disable PWM outputs on debug stop
-  DBGMCU->APB1FZR1 |= DBGMCU_APB1FZR1_DBG_TIM2_STOP;  // freeze TIM2 on debug stop
-  DBGMCU->APB1FZR1 |= DBGMCU_APB1FZR1_DBG_TIM6_STOP;  // freeze TIM6 on debug stop
-  DBGMCU->APB1FZR1 |= DBGMCU_APB1FZR1_DBG_TIM7_STOP;  // freeze TIM7 on debug stop
+  display_init();
+
   /* USER CODE END 2 */
 
-  /* Init scheduler */
-  osKernelInitialize();  /* Call init function for freertos objects (in freertos.c) */
   MX_FREERTOS_Init();
-  /* Start scheduler */
-  osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
@@ -135,7 +141,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-
+    assert(false);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */

@@ -303,7 +303,83 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* i2cHandle)
   }
 }
 
+/**
+  * @brief This function handles I2C1 event global interrupt / I2C1 wake-up interrupt through EXTI line 23.
+  */
+void I2C1_IRQHandler(void)
+{
+  /* USER CODE BEGIN I2C1_IRQn 0 */
+
+  /* USER CODE END I2C1_IRQn 0 */
+  if (hi2c1.Instance->ISR & (I2C_FLAG_BERR | I2C_FLAG_ARLO | I2C_FLAG_OVR)) {
+    HAL_I2C_ER_IRQHandler(&hi2c1);
+  } else {
+    HAL_I2C_EV_IRQHandler(&hi2c1);
+  }
+  /* USER CODE BEGIN I2C1_IRQn 1 */
+
+  /* USER CODE END I2C1_IRQn 1 */
+}
+
+/**
+  * @brief This function handles I2C2 global interrupt.
+  */
+void I2C2_IRQHandler(void)
+{
+  /* USER CODE BEGIN I2C2_IRQn 0 */
+
+  /* USER CODE END I2C2_IRQn 0 */
+  if (hi2c2.Instance->ISR & (I2C_FLAG_BERR | I2C_FLAG_ARLO | I2C_FLAG_OVR)) {
+    HAL_I2C_ER_IRQHandler(&hi2c2);
+  } else {
+    HAL_I2C_EV_IRQHandler(&hi2c2);
+  }
+  /* USER CODE BEGIN I2C2_IRQn 1 */
+
+  /* USER CODE END I2C2_IRQn 1 */
+}
+
 /* USER CODE BEGIN 1 */
+
+void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+
+}
+
+void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+
+}
+
+void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+
+}
+
+void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef* hi2c)
+{
+
+}
+
+void i2c1_send(uint8_t address, uint8_t* buffer, uint32_t length, opt_callback_t cb)
+{
+    HAL_I2C_Master_Transmit_DMA(&hi2c1, address, buffer, length);
+}
+
+void i2c2_send(uint8_t address, uint8_t* buffer, uint32_t length, opt_callback_t cb)
+{
+    HAL_I2C_Master_Transmit_DMA(&hi2c2, address, buffer, length);
+}
+
+void i2c1_recieve(uint8_t* buffer, uint32_t max_length, opt_callback_t cb)
+{
+    HAL_I2C_Slave_Receive_DMA(&hi2c1, buffer, max_length);
+}
+
+void i2c2_recieve(uint8_t* buffer, uint32_t max_length, opt_callback_t cb)
+{
+    HAL_I2C_Slave_Receive_DMA(&hi2c2, buffer, max_length);
+}
 
 /* USER CODE END 1 */
 

@@ -21,7 +21,7 @@
 #include "spi.h"
 
 /* USER CODE BEGIN 0 */
-
+static opt_callback_t operation_callback;
 /* USER CODE END 0 */
 
 SPI_HandleTypeDef hspi2;
@@ -46,7 +46,9 @@ void MX_SPI2_Init(void)
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  // A prescaler of 8 gives us a baud of 25 / 8 = 3.125MHz
+  // Should give a cycle time between 400 and 800 ns
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -56,7 +58,7 @@ void MX_SPI2_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN SPI2_Init 2 */
-
+  operation_callback = NULL;
   /* USER CODE END SPI2_Init 2 */
 
 }
@@ -160,7 +162,69 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* spiHandle)
   }
 }
 
+/**
+  * @brief This function handles SPI2 global interrupt.
+  */
+void SPI2_IRQHandler(void)
+{
+  /* USER CODE BEGIN SPI2_IRQn 0 */
+
+  /* USER CODE END SPI2_IRQn 0 */
+  HAL_SPI_IRQHandler(&hspi2);
+  /* USER CODE BEGIN SPI2_IRQn 1 */
+
+  /* USER CODE END SPI2_IRQn 1 */
+}
+
 /* USER CODE BEGIN 1 */
+
+void spi2_send(uint8_t* buffer, uint32_t length, opt_callback_t cb)
+{
+    if (HAL_OK == HAL_SPI_Transmit_DMA(&hspi2, buffer, length))
+    {
+      operation_callback = cb;
+    }
+    else
+    {
+      if (NULL != cb)
+      {
+        cb(0, 0);
+      }
+    }
+}
+
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef* hspi)
+{
+  if (hspi == &hspi2)
+  {
+    if (NULL != operation_callback)
+    {
+      operation_callback(0, 0);
+    }
+  }
+}
+
+void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef* hspi)
+{
+  if (hspi == &hspi2)
+  {
+    if (NULL != operation_callback)
+    {
+      operation_callback(0, 0);
+    }
+  }
+}
+
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef* hspi)
+{
+  if (hspi == &hspi2)
+  {
+    if (NULL != operation_callback)
+    {
+      operation_callback(0, 0);
+    }
+  }
+}
 
 /* USER CODE END 1 */
 

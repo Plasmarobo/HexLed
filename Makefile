@@ -83,6 +83,9 @@ Src/usart.c \
 Src/leds.c \
 Src/display.c \
 Src/reset_info.c \
+Src/comm_stack.c \
+Src/comm_protocol.c \
+Src/serial_output.c \
 Src/fast_hsv2rgb_32bit.c
 
 # ASM sources
@@ -131,7 +134,8 @@ AS_DEFS =
 # C defines
 C_DEFS =  \
 -DUSE_HAL_DRIVER \
--DSTM32L071xx
+-DSTM32L071xx \
+-DDEBUG
 
 # AS includes
 AS_INCLUDES =  \

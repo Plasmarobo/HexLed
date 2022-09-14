@@ -21,6 +21,9 @@
 #include "spi.h"
 
 /* USER CODE BEGIN 0 */
+#define SPI_SUCCESS (0)
+#define SPI_ERROR   (1)
+
 static opt_callback_t operation_callback;
 /* USER CODE END 0 */
 
@@ -188,7 +191,7 @@ void spi2_send(uint8_t* buffer, uint32_t length, opt_callback_t cb)
     {
       if (NULL != cb)
       {
-        cb(0, 0);
+        cb(SPI_ERROR, 0);
       }
     }
 }
@@ -199,7 +202,7 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef* hspi)
   {
     if (NULL != operation_callback)
     {
-      operation_callback(0, 0);
+      operation_callback(SPI_SUCCESS, 0);
     }
   }
 }
@@ -210,7 +213,7 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef* hspi)
   {
     if (NULL != operation_callback)
     {
-      operation_callback(0, 0);
+      operation_callback(SPI_SUCCESS, 0);
     }
   }
 }
@@ -221,7 +224,7 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef* hspi)
   {
     if (NULL != operation_callback)
     {
-      operation_callback(0, 0);
+      operation_callback(SPI_SUCCESS, 0);
     }
   }
 }

@@ -36,7 +36,7 @@
 UART_HandleTypeDef huart1;
 
 static StaticQueue_t message_queue_impl;
-uint8_t message_queue_buffer[MAX_MESSAGE_CONTENT_LENGTH * MAX_MESSAGE_QUEUE_LENGTH];
+static uint8_t message_queue_buffer[MAX_MESSAGE_CONTENT_LENGTH * MAX_MESSAGE_QUEUE_LENGTH];
 static QueueHandle_t message_queue;
 
 static StackType_t stack_buffer[UART_TASK_STACK_SIZE];

@@ -1,0 +1,40 @@
+---
+BasedOnStyle: LLVM
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: 'true'
+AlignConsecutiveDeclarations: 'true'
+AlignOperands: 'true'
+AllowAllConstructorInitializersOnNextLine: 'false'
+AllowAllParametersOfDeclarationOnNextLine: 'false'
+AllowShortBlocksOnASingleLine: 'false'
+AllowShortCaseLabelsOnASingleLine: 'false'
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLambdasOnASingleLine: None
+AllowShortLoopsOnASingleLine: 'false'
+BinPackArguments: 'false'
+BinPackParameters: 'false'
+BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Allman
+ColumnLimit: '120'
+Cpp11BracedListStyle: 'false'
+ExperimentalAutoDetectBinPacking: 'true'
+IncludeBlocks: Preserve
+IndentCaseLabels: 'true'
+PenaltyBreakAssignment: '50'
+PenaltyBreakBeforeFirstCallParameter: '500'
+PenaltyBreakComment: '70'
+PenaltyBreakFirstLessLess: '250'
+PenaltyBreakString: '120'
+PenaltyExcessCharacter: '3'
+PenaltyReturnTypeOnItsOwnLine: '999'
+PointerAlignment: Left
+SortUsingDeclarations: 'true'
+SpaceBeforeCpp11BracedList: 'true'
+SpaceInEmptyParentheses: 'false'
+SpacesInAngles: 'false'
+SpacesInSquareBrackets: 'false'
+TabWidth: '2'
+UseTab: Never
+
+...

@@ -20,8 +20,18 @@
 /* Includes ------------------------------------------------------------------*/
 #include "i2c.h"
 
+#include "comm_protocol.h"
+
 /* USER CODE BEGIN 0 */
 
+#define I2C_DEFAULT_TIMEOUT (2000)
+
+static opt_callback_t     i2c1_rx_callback;
+static opt_callback_t     i2c1_tx_callback;
+static opt_callback_t     i2c2_rx_callback;
+static opt_callback_t     i2c2_tx_callback;
+static address_callback_t i2c2_address_callback;
+static opt_callback_t     i2c2_listen_callback;
 /* USER CODE END 0 */
 
 I2C_HandleTypeDef hi2c1;
@@ -44,7 +54,7 @@ void MX_I2C1_Init(void)
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
   hi2c1.Init.Timing = 0x00200B2B;
-  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.OwnAddress1      = 0x02;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
   hi2c1.Init.OwnAddress2 = 0;
@@ -83,13 +93,14 @@ void MX_I2C2_Init(void)
   /* USER CODE BEGIN I2C2_Init 1 */
 
   /* USER CODE END I2C2_Init 1 */
+  // We will respond to 0x2E, 0x30, 0x32
   hi2c2.Instance = I2C2;
   hi2c2.Init.Timing = 0x00200B2B;
-  hi2c2.Init.OwnAddress1 = 32;
+  hi2c2.Init.OwnAddress1      = COMM_PROTOCOL_BASE_ADDRESS;
   hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c2.Init.OwnAddress2 = 0;
-  hi2c2.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c2.Init.DualAddressMode  = I2C_DUALADDRESS_ENABLED;
+  hi2c2.Init.OwnAddress2      = COMM_PROTOCOL_MASK_ADDRESS;
+  hi2c2.Init.OwnAddress2Masks = I2C_OA2_MASK01;
   hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_ENABLE;
   hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_ENABLE;
   if (HAL_I2C_Init(&hi2c2) != HAL_OK)
@@ -109,7 +120,14 @@ void MX_I2C2_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN I2C2_Init 2 */
+  HAL_I2C_EnableListen_IT(&hi2c2);
 
+  i2c1_rx_callback      = NULL;
+  i2c1_tx_callback      = NULL;
+  i2c2_rx_callback      = NULL;
+  i2c2_tx_callback      = NULL;
+  i2c2_address_callback = NULL;
+  i2c2_listen_callback  = NULL;
   /* USER CODE END I2C2_Init 2 */
 
 }
@@ -340,45 +358,170 @@ void I2C2_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
+void HAL_I2C_AddrCallback(I2C_HandleTypeDef* hi2c, uint8_t direction, uint16_t address_match_code)
+{
+  if ((hi2c == &hi2c2) && (NULL != i2c2_address_callback))
+  {
+    i2c2_address_callback(direction, address_match_code);
+  }
+}
+
+void HAL_I2C_ListenCpltCallback(I2C_HandleTypeDef* hi2c)
+{
+  if ((hi2c == &hi2c2) && (NULL != i2c2_listen_callback))
+  {
+    i2c2_listen_callback(I2C_SUCCESS, 0);
+  }
+}
 
 void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
-
+  if (hi2c == &hi2c1)
+  {
+    if (NULL != i2c1_tx_callback)
+    {
+      i2c1_tx_callback(I2C_SUCCESS, 0);
+      i2c1_tx_callback = NULL;
+    }
+  }
+  else if (hi2c == &hi2c2)
+  {
+    if (NULL != i2c2_tx_callback)
+    {
+      i2c2_tx_callback(I2C_SUCCESS, 0);
+      i2c2_tx_callback = NULL;
+    }
+  }
 }
 
 void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
-
+  if (hi2c == &hi2c1)
+  {
+    if (NULL != i2c1_rx_callback)
+    {
+      i2c1_rx_callback(I2C_SUCCESS, 0);
+      i2c1_rx_callback = NULL;
+    }
+  }
+  else if (hi2c == &hi2c2)
+  {
+    if (NULL != i2c2_rx_callback)
+    {
+      i2c2_rx_callback(I2C_SUCCESS, 0);
+      i2c2_rx_callback = NULL;
+    }
+  }
 }
 
 void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
-
+  if (hi2c == &hi2c1)
+  {
+    if (NULL != i2c1_tx_callback)
+    {
+      i2c1_tx_callback(I2C_SUCCESS, 0);
+      i2c1_tx_callback = NULL;
+    }
+  }
+  else if (hi2c == &hi2c2)
+  {
+    if (NULL != i2c2_tx_callback)
+    {
+      i2c2_tx_callback(I2C_SUCCESS, 0);
+      i2c2_tx_callback = NULL;
+    }
+  }
 }
 
 void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef* hi2c)
 {
-
+  if (hi2c == &hi2c1)
+  {
+    if (NULL != i2c1_rx_callback)
+    {
+      i2c1_rx_callback(I2C_SUCCESS, 0);
+      i2c1_rx_callback = NULL;
+    }
+  }
+  else if (hi2c == &hi2c2)
+  {
+    if (NULL != i2c2_rx_callback)
+    {
+      i2c2_rx_callback(I2C_SUCCESS, 0);
+      i2c2_rx_callback = NULL;
+    }
+  }
 }
 
-void i2c1_send(uint8_t address, uint8_t* buffer, uint32_t length, opt_callback_t cb)
+void i2c1_send(uint16_t address, uint8_t* buffer, uint32_t length, opt_callback_t cb)
 {
-    HAL_I2C_Master_Transmit_DMA(&hi2c1, address, buffer, length);
+  if (HAL_OK == HAL_I2C_Master_Transmit_DMA(&hi2c1, address, buffer, length))
+  {
+    i2c1_tx_callback = cb;
+  }
+  else
+  {
+    if (NULL != cb)
+    {
+      cb(I2C_ERROR, 0);
+    }
+  }
 }
 
-void i2c2_send(uint8_t address, uint8_t* buffer, uint32_t length, opt_callback_t cb)
+void i2c2_send(uint8_t* buffer, uint32_t length, opt_callback_t cb)
 {
-    HAL_I2C_Master_Transmit_DMA(&hi2c2, address, buffer, length);
+  if (HAL_OK == HAL_I2C_Slave_Transmit_DMA(&hi2c2, buffer, length))
+  {
+    i2c2_tx_callback = cb;
+  }
+  else
+  {
+    if (NULL != cb)
+    {
+      cb(I2C_ERROR, 0);
+    }
+  }
 }
 
-void i2c1_recieve(uint8_t* buffer, uint32_t max_length, opt_callback_t cb)
+void i2c1_receive(uint16_t address, uint8_t* buffer, uint32_t max_length, opt_callback_t cb)
 {
-    HAL_I2C_Slave_Receive_DMA(&hi2c1, buffer, max_length);
+  if (HAL_OK == HAL_I2C_Master_Receive_DMA(&hi2c1, address, buffer, max_length))
+  {
+    i2c1_rx_callback = cb;
+  }
+  else
+  {
+    if (NULL != cb)
+    {
+      cb(I2C_ERROR, 0);
+    }
+  }
 }
 
-void i2c2_recieve(uint8_t* buffer, uint32_t max_length, opt_callback_t cb)
+void i2c2_receive(uint8_t* buffer, uint32_t max_length, opt_callback_t cb)
 {
-    HAL_I2C_Slave_Receive_DMA(&hi2c2, buffer, max_length);
+  if (HAL_OK == HAL_I2C_Slave_Receive_DMA(&hi2c2, buffer, max_length))
+  {
+    i2c2_rx_callback = cb;
+  }
+  else
+  {
+    if (NULL != cb)
+    {
+      cb(I2C_ERROR, 0);
+    }
+  }
+}
+
+void i2c2_set_address_callback(address_callback_t cb)
+{
+  i2c2_address_callback = cb;
+}
+
+void i2c2_set_listen_callback(opt_callback_t cb)
+{
+  i2c2_listen_callback = cb;
 }
 
 /* USER CODE END 1 */

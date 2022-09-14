@@ -12,8 +12,6 @@ typedef struct {
     I2C_HandleTypeDef *hi2c;
 } i2c_context_t;
 
-static DMA_Data_t DMAData;
-
 static hal_i2c_controller_t i2c1_controller;
 static hal_i2c_transfer_t i2c1_transfer_buffer[I2C_TRANSFER_QUEUE_SIZE];
 static i2c_context_t i2c1_ctx;

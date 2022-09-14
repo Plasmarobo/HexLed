@@ -19,18 +19,22 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+
 #include "FreeRTOS.h"
+
+#include "comm_stack.h"
+#include "display.h"
 #include "dma.h"
+#include "gpio.h"
 #include "i2c.h"
 #include "iwdg.h"
+#include "reset_info.h"
 #include "rtc.h"
+#include "serial_output.h"
 #include "spi.h"
 #include "tim.h"
-#include "usart.h"
-#include "gpio.h"
 #include "timers.h"
-#include "display.h"
-#include "reset_info.h"
+#include "usart.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -62,7 +66,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-static char message_buffer[MAX_MESSAGE_CONTENT_LENGTH];
 
 /* USER CODE END PV */
 
@@ -125,11 +128,16 @@ int main(void)
   MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
 
-  memset(message_buffer, '\0', MAX_MESSAGE_CONTENT_LENGTH);
-  snprintf(message_buffer, MAX_MESSAGE_CONTENT_LENGTH, "The system reset cause is \"%s\"\r\n", reset_cause_get_name(reset_cause));
-  send_message(message_buffer);
-
   display_init();
+  display_set_rgb(0, 255, 0, 0);
+  display_set_rgb(1, 0, 255, 0);
+  display_set_rgb(2, 0, 0, 255);
+  display_set_rgb(3, 0, 255, 0);
+  display_set_rgb(4, 255, 0, 0);
+  display_set_rgb(5, 0, 255, 0);
+  // comm_stack_init();
+
+  serial_printf("Reset reason: %s", reset_cause_get_name(reset_cause));
 
   /* USER CODE END 2 */
 

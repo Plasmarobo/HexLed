@@ -11,9 +11,16 @@
 
 // Lower bits are not fixed, but we've tied them to ground in Rev2
 #define MUX_ADDRESS (0x70)
+#define MULTIPLEXER_TASK_STACK_SIZE (configMINIMAL_STACK_SIZE * 2)
+#define MULTIPLEXER_TASK_PRIORITY (12)
+
+static StackType_t stack_buffer[MULTIPLEXER_TASK_STACK_SIZE];
+static StaticTask_t tcb_buffer;
+static TaskHandle_t multiplexer_task;
 
 typedef enum
 {
+    MP_SETUP = 0,
     MP_IDLE,
     MP_CHANNEL_SELECT,
     MP_SEND,
@@ -34,16 +41,22 @@ typedef struct
 }
 control_register_t;
 
-static control_register_t control_reg;
-
 // Private functions
 int read_control_register(void);
 int select_channel(uint8_t subchannel);
+void multiplexer_task_handler(void *argument);
 
 // Public Interface
 int i2c_multiplexer_init(void)
 {
-
+    // Start task
+    multiplexer_task = xTaskCreateStatic(multiplexer_task_handler,
+                                        "multiplexer_task",
+                                        MULTIPLEXER_TASK_STACK_SIZE,
+                                        NULL,
+                                        MULTIPLEXER_TASK_PRIORITY,
+                                        stack_buffer,
+                                        &tcb_buffer);
 }
 
 int send_to_subchannel(int subchannel, uint16_t tx_len, uint8_t* data, i2c_callback_t reply_cb)
@@ -70,4 +83,18 @@ int read_control_register(void)
 int select_channel(void)
 {
 
+}
+
+void multiplexer_task_handler(void* argument)
+{    
+    static control_register_t control_reg;
+    static multiplexer_state_t state = MP_SETUP;
+    for(;;)
+    {
+        control_reg = read_control_register();
+        switch(state)
+        {
+
+        }
+    }
 }

@@ -28,6 +28,9 @@
 #define BYTES_PER_LED (BITS_PER_BIT * 3)
 #define CODEPOINT_LENGTH (RST_BYTES + (BYTES_PER_LED * LED_COUNT))
 
+// Brightness from 0 to 255
+static uint16_t brightness = 96;
+
 /*
  * Pointer swapping:
  * 	sext.	r g b	r<>b	g<>b	r <> g	result
@@ -104,6 +107,12 @@ const uint32_t LOW = 0x4;
 const uint32_t HIGH = 0x6;
 const uint32_t RST = 0x0;
 
+static inline uint8_t scale_brightness(uint8_t input)
+{
+  uint16_t tmp = input * brightness;
+  return (uint8_t)(tmp >> 8);
+}
+
 static inline uint32_t byte_to_wave(uint8_t b)
 {
     uint32_t wave = 0;
@@ -135,9 +144,9 @@ void set_rgb(uint8_t address, uint8_t r, uint8_t g, uint8_t b)
     if (address < LED_COUNT)
     {
         uint32_t offset = RST_BYTES + (address * BYTES_PER_LED);
-        set_codepoint(&offset, byte_to_wave(gamma8[g]));
-        set_codepoint(&offset, byte_to_wave(gamma8[r]));
-        set_codepoint(&offset, byte_to_wave(gamma8[b]));
+        set_codepoint(&offset, byte_to_wave(gamma8[scale_brightness(g)]));
+        set_codepoint(&offset, byte_to_wave(gamma8[scale_brightness(r)]));
+        set_codepoint(&offset, byte_to_wave(gamma8[scale_brightness(b)]));
     }
 }
 

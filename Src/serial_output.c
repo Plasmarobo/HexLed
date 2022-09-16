@@ -7,7 +7,7 @@
 #include <string.h>
 
 #ifdef DEBUG
-static char message_buffer[MAX_MESSAGE_CONTENT_LENGTH];
+static char message_buffer[MAX_MESSAGE_CONTENT_LENGTH + 1];
 #endif
 
 int serial_print(const char* str)
@@ -18,6 +18,7 @@ int serial_print(const char* str)
   {
     strncpy(message_buffer, str, MAX_MESSAGE_CONTENT_LENGTH);
     len = strlen(str);
+    message_buffer[MAX_MESSAGE_CONTENT_LENGTH] = '\0';
     send_message(message_buffer);
   }
 #else
@@ -37,6 +38,7 @@ int serial_printf(const char* format, ...)
     va_start(arg, format);
     len = vsnprintf(message_buffer, MAX_MESSAGE_CONTENT_LENGTH, format, arg);
     va_end(arg);
+    message_buffer[MAX_MESSAGE_CONTENT_LENGTH] = '\0';
     send_message(message_buffer);
   }
 #else

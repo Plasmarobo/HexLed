@@ -1,4 +1,3 @@
-
 #include "comm_stack.h"
 
 #include "FreeRTOS.h"
@@ -17,26 +16,32 @@
 #include <string.h>
 
 #define COMM_TASK_STACK_SIZE (configMINIMAL_STACK_SIZE * 4)
-#define COMM_TASK_STACK_PRIORITY (10)
+#define COMM_TASK_STACK_PRIORITY (15)
 
-#define COMM_STACK_MESSAGE_PERIOD (200)
+#define COMM_STACK_MESSAGE_PERIOD (125)
+
+#define COMM_STACK_STARTUP_DELAY_MS (100)
+#define COMM_STACK_MULTIPLEXER_COOLDOWN_MS (5)
 
 #define CONTROLLER_MASK_USER_DATA (0x01)
 #define CONTROLLER_MASK_INTERRUPT (0x02)
 #define CONTROLLER_MASK_UNKNOWN (0x04)
 
-#define MULTIPLEXER_ADDRESS (0xE0 << 1)
+#define CONNECTED_INTERRUPTS_MASK (0x7)
+
+#define MULTIPLEXER_ADDRESS (0xE0)
 #define I2C_BUFFER_SIZE (128)
 #define I2C_READ (0x01)
 #define I2C_WRITE (0x00)
 
 #define CHANNEL_MASK(x) (1 << x)
 
-#define I2C_TIMEOUT_MS (250)
+#define I2C_TIMEOUT_MS (100)
 
-#define COMM_MESSAGE_QUEUE_MAX_LENGTH (16)
+#define NETWORK_MESSAGE_QUEUE_MAX_LENGTH (16)
 
-#define RESPONDER_TDMA_PERIOD_MS (100)
+#define RESPONDER_TDMA_PERIOD_MS (300)
+#define RESPONDER_SETTLE_TIME_MS (50)
 
 #define RESPONDER_MAX_READ (256)
 
@@ -62,17 +67,25 @@ typedef enum
 
 typedef enum
 {
-  CONTROLLER_ERROR_NONE = 0,
-  CONTROLLER_ERROR_TRIGGER,
-  CONTROLLER_ERROR_MULTIPLEXER,
-  CONTROLLER_ERROR_RESPONDER_TIMEOUT,
-  CONTROLLER_ERROR_RESPONDER_COMM_ERROR,
-  CONTROLLER_ERROR_RESPONDER_MSG_ERROR,
-  RESPONDER_ERROR_TIMEOUT,
-  RESPONDER_ERROR_INVALID_COMMAND,
-  RESPONDER_ERROR_INVALID_LENGTH,
-  RESPONDER_ERROR_END_OF_STREAM,
+  ERROR_NONE = 0,
+  ERROR_TRIGGER,
+  ERROR_TIMEOUT,
+  ERROR_COMM,
+  ERROR_MSG,
+  ERROR_INVALID_COMMAND,
+  ERROR_INVALID_LENGTH,
+  ERROR_END_OF_STREAM,
 } error_code_t;
+
+#ifdef DEBUG
+const char* comm_port_text[] = {
+  "A", "B", "C", "", "", "", "MP",
+};
+
+const char* error_text[] = {
+  "None", "Trigger", "Timeout", "Comm", "Msg", "InvCmd", "InvLen", "EOS",
+};
+#endif
 
 typedef struct
 {
@@ -82,9 +95,9 @@ typedef struct
 
 static protocol_message_t controller_message_cache;
 
-static StaticQueue_t comm_message_queue_impl;
-static uint8_t       comm_message_queue_buffer[COMM_MESSAGE_QUEUE_MAX_LENGTH * sizeof(protocol_message_t)];
-static QueueHandle_t comm_message_queue;
+static StaticQueue_t network_message_queue_impl;
+static uint8_t       network_message_queue_buffer[NETWORK_MESSAGE_QUEUE_MAX_LENGTH * sizeof(network_message_t)];
+static QueueHandle_t network_message_queue;
 
 static StackType_t  responder_stack_buffer[COMM_TASK_STACK_SIZE];
 static StaticTask_t responder_tcb_buffer;
@@ -133,14 +146,14 @@ static uint8_t output_channel_led[COMM_PORT_MAX] = {
   5,
 };
 
-static void handle_controller_error(uint8_t response, uint8_t status, uint32_t error_code)
+static void handle_controller_error(uint8_t response, uint8_t status, uint32_t port, uint32_t error_code)
 {
-  serial_printf("Controller error: %d %d %d\r\n", response, status, error_code);
+  serial_printf("Controller error: %d %d %s %s\r\n", response, status, comm_port_text[port], error_text[error_code]);
 }
 
 static void handle_responder_error(uint8_t response, uint8_t status, uint32_t error_code)
 {
-  serial_printf("Responder error: %d %d %d\r\n", response, status, error_code);
+  serial_printf("Responder error: %d %d Responder %s\r\n", response, status, error_text[error_code]);
 }
 
 // Handles i2c interrupts from the controller
@@ -237,83 +250,96 @@ static void handle_i2c2_address(uint8_t direction, uint16_t address)
 
 void controller_handler(void* arguments)
 {
-  uint32_t           event;
   BaseType_t         task_status;
   uint32_t           i2c_status;
-  uint8_t            current_channel = COMM_PORT_A;
+  uint8_t            current_channel = COMM_PORT_MAX;
   control_register_t multiplexer_status;
+  network_message_t  network_message;
+  vTaskDelay(pdMS_TO_TICKS(COMM_STACK_STARTUP_DELAY_MS));
   for (;;)
   {
     // Deselect Multiplexer channel
+    vTaskDelay(pdMS_TO_TICKS(COMM_STACK_MULTIPLEXER_COOLDOWN_MS));
     multiplexer_status.channel = 0;
     multiplexer_status.enable  = 0;
     // Start Multiplexer query
     i2c1_send(MULTIPLEXER_ADDRESS, (uint8_t*)&multiplexer_status, 1, comm_stack_controller_i2c_handler);
     task_status = xTaskNotifyWait(pdFALSE, 0, &i2c_status, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
-    if (pdFALSE == task_status || I2C_SUCCESS != i2c_status)
+    if (pdFALSE == task_status)
     {
-      handle_controller_error(i2c_status, task_status, CONTROLLER_ERROR_MULTIPLEXER);
+      handle_controller_error(i2c_status, task_status, COMM_PORT_MULTIPLEXER, ERROR_TIMEOUT);
       continue;
     }
-    // Wait for a notification
-    task_status = xTaskNotifyWait(pdFALSE,
-                                  0, // Clear no bits
-                                  &event,
-                                  portMAX_DELAY);
-    if (pdTRUE != task_status)
+    if (I2C_SUCCESS != i2c_status)
     {
-      handle_controller_error(i2c_status, task_status, CONTROLLER_ERROR_TRIGGER);
+      handle_controller_error(i2c_status, task_status, COMM_PORT_MULTIPLEXER, ERROR_COMM);
       continue;
     }
-    if (CONTROLLER_MASK_INTERRUPT == event)
-    {
-      // Start Multiplexer query: read the status register
-      i2c1_receive(MULTIPLEXER_ADDRESS, (uint8_t*)&multiplexer_status, sizeof(control_register_t), comm_stack_controller_i2c_handler);
-      task_status = xTaskNotifyWait(pdFALSE, 0, &i2c_status, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
-      if (pdTRUE != task_status || I2C_SUCCESS != i2c_status)
-      {
-        handle_controller_error(i2c_status, task_status, CONTROLLER_ERROR_MULTIPLEXER);
-        continue;
-      }
 
-      // Start with the last serviced channel + 1 to ensure equal timesharing
-      while (multiplexer_status.interrupts != 0)
+    vTaskDelay(pdMS_TO_TICKS(COMM_STACK_MULTIPLEXER_COOLDOWN_MS));
+    // Start Multiplexer query: read the status register
+    i2c1_receive(MULTIPLEXER_ADDRESS, (uint8_t*)&multiplexer_status, sizeof(control_register_t), comm_stack_controller_i2c_handler);
+    task_status = xTaskNotifyWait(pdFALSE, 0, &i2c_status, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
+    if (pdFALSE == task_status)
+    {
+      handle_controller_error(i2c_status, task_status, COMM_PORT_MULTIPLEXER, ERROR_TIMEOUT);
+      continue;
+    }
+
+    if (I2C_SUCCESS != i2c_status)
+    {
+      handle_controller_error(i2c_status, task_status, COMM_PORT_MULTIPLEXER, ERROR_COMM);
+      continue;
+    }
+
+    // Check that we have exclusive control of at least one bus
+    // INTs are active low, so look for ANY low bit in the mask
+    if ((~multiplexer_status.interrupts & CONNECTED_INTERRUPTS_MASK))
+    {
+      ++current_channel;
+      if (COMM_PORT_MAX <= current_channel)
       {
-        // Scan each interrupt in the sequence
-        while (!(multiplexer_status.interrupts & CHANNEL_MASK(current_channel)))
-        {
-          // Advance channel
-          ++current_channel;
-          if (current_channel >= COMM_PORT_MAX)
-          {
-            current_channel = COMM_PORT_A;
-          }
-          taskYIELD();
-        }
+        current_channel = COMM_PORT_A;
+      }
+      // Service one responder before switching contexts to give other tasks a chance
+      if (~multiplexer_status.interrupts & CHANNEL_MASK(current_channel))
+      {
         // Select Multiplexer channel to enable/connect
         multiplexer_status.enable  = 1;
         multiplexer_status.channel = current_channel;
 
         i2c1_send(MULTIPLEXER_ADDRESS, (uint8_t*)&multiplexer_status, sizeof(control_register_t), comm_stack_controller_i2c_handler);
         task_status = xTaskNotifyWait(pdFALSE, 0, &i2c_status, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
-        if (pdTRUE != task_status || I2C_SUCCESS != i2c_status)
+        if (pdFALSE == task_status)
         {
-          handle_controller_error(i2c_status, task_status, CONTROLLER_ERROR_MULTIPLEXER);
+          handle_controller_error(i2c_status, task_status, current_channel, ERROR_TIMEOUT);
           continue;
         }
+
+        if (I2C_SUCCESS != i2c_status)
+        {
+          handle_controller_error(i2c_status, task_status, current_channel, ERROR_COMM);
+          continue;
+        }
+        // TEST: Send a whoami to get information about what is connected downstream
         controller_message_cache.header = COMMAND_WHOAMI;
         controller_message_cache.length = 1;
-        // Send the EXPECTED address (responder should reply to any/all)
+        // Whoami should contain the address we EXPECT address (responder should reply to any/all)
         controller_message_cache.data[0] = input_channel_addresses[current_channel];
         i2c1_send(input_channel_addresses[current_channel],
                   (uint8_t*)&controller_message_cache,
                   controller_message_cache.length + COMM_PROTOCOL_MESSAGE_HEADER_LENGTH,
                   comm_stack_controller_i2c_handler);
         task_status = xTaskNotifyWait(pdFALSE, 0, &i2c_status, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
-
         if (pdFALSE == task_status)
         {
-          handle_controller_error(i2c_status, task_status, CONTROLLER_ERROR_RESPONDER_TIMEOUT);
+          handle_controller_error(i2c_status, task_status, current_channel, ERROR_TIMEOUT);
+          continue;
+        }
+
+        if (I2C_SUCCESS != i2c_status)
+        {
+          handle_controller_error(i2c_status, task_status, current_channel, ERROR_COMM);
           continue;
         }
 
@@ -324,15 +350,14 @@ void controller_handler(void* arguments)
         display_set_rgb(output_channel_led[current_channel], 255, 0, 0);
         if (pdFALSE == task_status)
         {
-          // TODO: more graceful channel error
-          handle_controller_error(i2c_status, task_status, CONTROLLER_ERROR_RESPONDER_TIMEOUT);
-          // We cannot proceed until this error is corrected
+          handle_controller_error(i2c_status, task_status, current_channel, ERROR_TIMEOUT);
           continue;
         }
-        else if (I2C_SUCCESS != i2c_status)
+
+        if (I2C_SUCCESS != i2c_status)
         {
           // Unknown error
-          handle_controller_error(i2c_status, task_status, CONTROLLER_ERROR_RESPONDER_COMM_ERROR);
+          handle_controller_error(i2c_status, task_status, current_channel, ERROR_COMM);
           continue;
         }
         // We have a response, but we don't know if it is correct yet
@@ -340,7 +365,7 @@ void controller_handler(void* arguments)
         // The response header should indicate success
         if (RESPONSE_SUCCESS != controller_message_cache.header)
         {
-          handle_controller_error(i2c_status, task_status, CONTROLLER_ERROR_RESPONDER_MSG_ERROR);
+          handle_controller_error(i2c_status, task_status, current_channel, controller_message_cache.header);
           display_set_rgb(output_channel_led[current_channel], 255, 255, 0);
           continue;
         }
@@ -349,11 +374,18 @@ void controller_handler(void* arguments)
         i2c1_receive(input_channel_addresses[current_channel], &controller_message_cache.length, 1, comm_stack_controller_i2c_handler);
         task_status = xTaskNotifyWait(pdFALSE, 0, &i2c_status, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
 
-        if (pdFALSE == task_status || I2C_SUCCESS != i2c_status)
+        if (pdFALSE == task_status)
         {
-          handle_controller_error(i2c_status, task_status, CONTROLLER_ERROR_RESPONDER_MSG_ERROR);
+          handle_controller_error(i2c_status, task_status, current_channel, ERROR_TIMEOUT);
           continue;
         }
+
+        if (I2C_SUCCESS != i2c_status)
+        {
+          handle_controller_error(i2c_status, task_status, current_channel, ERROR_COMM);
+          continue;
+        }
+
         // Read body of message, [length] bytes
         i2c1_receive(input_channel_addresses[current_channel],
                      (uint8_t*)&controller_message_cache.data,
@@ -375,77 +407,124 @@ void controller_handler(void* arguments)
         // Deselect Multiplexer channel
         multiplexer_status.channel = 0;
         multiplexer_status.enable  = 0;
-        // Start Multiplexer query
         i2c1_send(MULTIPLEXER_ADDRESS, (uint8_t*)&multiplexer_status, 1, comm_stack_controller_i2c_handler);
         task_status = xTaskNotifyWait(pdFALSE, 0, &i2c_status, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
-        if (pdFALSE == task_status || I2C_SUCCESS != i2c_status)
+        if (pdFALSE == task_status)
         {
-          handle_controller_error(i2c_status, task_status, CONTROLLER_ERROR_MULTIPLEXER);
+          handle_controller_error(i2c_status, task_status, COMM_PORT_MULTIPLEXER, ERROR_TIMEOUT);
+          continue;
+        }
+
+        if (I2C_SUCCESS != i2c_status)
+        {
+          handle_controller_error(i2c_status, task_status, COMM_PORT_MULTIPLEXER, ERROR_COMM);
           continue;
         }
       }
-    }
-
-    // Dequeue any messages we are waiting to send
-    while ((uxQueueMessagesWaiting(comm_message_queue) > 0) &&
-           (pdTRUE == xQueueReceive(comm_message_queue, &controller_message_cache, pdMS_TO_TICKS(COMM_STACK_MESSAGE_PERIOD))))
-    {
-      // Select Multiplexer channel
-      multiplexer_status.enable = 1;
-      // Determine channel
-      multiplexer_status.channel = controller_message_cache.data[0];
-
-      i2c1_send(MULTIPLEXER_ADDRESS, (uint8_t*)&multiplexer_status, sizeof(control_register_t), comm_stack_controller_i2c_handler);
-      task_status = xTaskNotifyWait(pdFALSE, 0, &i2c_status, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
-      if (pdTRUE != task_status || I2C_SUCCESS != i2c_status)
-      {
-        handle_controller_error(i2c_status, task_status, CONTROLLER_ERROR_MULTIPLEXER);
-        continue;
-      }
-
-      // Write data to the responder
-      i2c1_send(controller_message_cache.header,
-                (uint8_t*)&controller_message_cache,
-                controller_message_cache.length + COMM_PROTOCOL_MESSAGE_HEADER_LENGTH,
-                comm_stack_controller_i2c_handler);
-
-      task_status = xTaskNotifyWait(pdFALSE, 0, &i2c_status, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
-      if (pdTRUE != task_status || I2C_SUCCESS != i2c_status)
-      {
-        handle_controller_error(i2c_status, task_status, CONTROLLER_ERROR_RESPONDER_COMM_ERROR);
-        continue;
-      }
-
-      // Read response (ack)
-      i2c1_receive(controller_message_cache.header,
-                   (uint8_t*)&controller_message_cache,
-                   sizeof(protocol_message_t),
-                   comm_stack_controller_i2c_handler);
-      task_status = xTaskNotifyWait(pdFALSE, 0, &i2c_status, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
-      if (pdTRUE != task_status || I2C_SUCCESS != i2c_status)
-      {
-        handle_controller_error(i2c_status, task_status, CONTROLLER_ERROR_RESPONDER_MSG_ERROR);
-        continue;
-      }
-
-      if (RESPONSE_SUCCESS != controller_message_cache.header)
-      {
-        handle_controller_error(i2c_status, task_status, controller_message_cache.header);
-        continue;
-      }
-
-      // Package the message on internal bus?
-      // internal_message_send(message_cache);
-      // Deselect Multiplexer channel
+      vTaskDelay(pdMS_TO_TICKS(COMM_STACK_MULTIPLEXER_COOLDOWN_MS));
       multiplexer_status.channel = 0;
       multiplexer_status.enable  = 0;
       // Start Multiplexer query
       i2c1_send(MULTIPLEXER_ADDRESS, (uint8_t*)&multiplexer_status, 1, comm_stack_controller_i2c_handler);
       task_status = xTaskNotifyWait(pdFALSE, 0, &i2c_status, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
-      if (pdFALSE == task_status || I2C_SUCCESS != i2c_status)
+      if (pdFALSE == task_status)
       {
-        handle_controller_error(i2c_status, task_status, CONTROLLER_ERROR_MULTIPLEXER);
+        handle_controller_error(i2c_status, task_status, COMM_PORT_MULTIPLEXER, ERROR_TIMEOUT);
         continue;
+      }
+      if (I2C_SUCCESS != i2c_status)
+      {
+        handle_controller_error(i2c_status, task_status, COMM_PORT_MULTIPLEXER, ERROR_COMM);
+        continue;
+      }
+      vTaskDelay(pdMS_TO_TICKS(COMM_STACK_MULTIPLEXER_COOLDOWN_MS));
+      // ================================== NETWORK MESSAGES ================================== //
+      // Dequeue any messages we are waiting to send
+      while ((uxQueueMessagesWaiting(network_message_queue) > 0) &&
+             (pdTRUE == xQueueReceive(network_message_queue, &network_message, pdMS_TO_TICKS(COMM_STACK_MESSAGE_PERIOD))))
+      {
+        // Select Multiplexer channel
+        multiplexer_status.enable = 1;
+        // Determine channel
+        multiplexer_status.channel = network_message.target_port;
+
+        i2c1_send(MULTIPLEXER_ADDRESS, (uint8_t*)&multiplexer_status, sizeof(control_register_t), comm_stack_controller_i2c_handler);
+        task_status = xTaskNotifyWait(pdFALSE, 0, &i2c_status, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
+        if (pdFALSE == task_status)
+        {
+          handle_controller_error(i2c_status, task_status, COMM_PORT_MULTIPLEXER, ERROR_TIMEOUT);
+          continue;
+        }
+
+        if (I2C_SUCCESS != i2c_status)
+        {
+          handle_controller_error(i2c_status, task_status, COMM_PORT_MULTIPLEXER, ERROR_COMM);
+          continue;
+        }
+
+        // Write data to the responder
+
+        i2c1_send(input_channel_addresses[network_message.target_port],
+                  (uint8_t*)&network_message.message,
+                  network_message.message.length + COMM_PROTOCOL_MESSAGE_HEADER_LENGTH,
+                  comm_stack_controller_i2c_handler);
+
+        task_status = xTaskNotifyWait(pdFALSE, 0, &i2c_status, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
+        if (pdFALSE == task_status)
+        {
+          handle_controller_error(i2c_status, task_status, network_message.target_port, ERROR_TIMEOUT);
+          continue;
+        }
+
+        if (I2C_SUCCESS != i2c_status)
+        {
+          handle_controller_error(i2c_status, task_status, network_message.target_port, ERROR_COMM);
+          continue;
+        }
+
+        // Read response (ack)
+        i2c1_receive(input_channel_addresses[network_message.target_port],
+                     (uint8_t*)&controller_message_cache,
+                     sizeof(protocol_message_t),
+                     comm_stack_controller_i2c_handler);
+        task_status = xTaskNotifyWait(pdFALSE, 0, &i2c_status, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
+        if (pdFALSE == task_status)
+        {
+          handle_controller_error(i2c_status, task_status, network_message.target_port, ERROR_TIMEOUT);
+          continue;
+        }
+
+        if (I2C_SUCCESS != i2c_status)
+        {
+          handle_controller_error(i2c_status, task_status, network_message.target_port, ERROR_COMM);
+          continue;
+        }
+
+        if (RESPONSE_SUCCESS != controller_message_cache.header)
+        {
+          handle_controller_error(i2c_status, task_status, network_message.target_port, controller_message_cache.header);
+          continue;
+        }
+
+        // TODO: Handle any response (if required)
+
+        // Deselect Multiplexer channel
+        multiplexer_status.channel = 0;
+        multiplexer_status.enable  = 0;
+        // Start Multiplexer query
+        i2c1_send(MULTIPLEXER_ADDRESS, (uint8_t*)&multiplexer_status, 1, comm_stack_controller_i2c_handler);
+        task_status = xTaskNotifyWait(pdFALSE, 0, &i2c_status, pdMS_TO_TICKS(I2C_TIMEOUT_MS));
+        if (pdFALSE == task_status)
+        {
+          handle_controller_error(i2c_status, task_status, COMM_PORT_MULTIPLEXER, ERROR_TIMEOUT);
+          continue;
+        }
+
+        if (I2C_SUCCESS != i2c_status)
+        {
+          handle_controller_error(i2c_status, task_status, COMM_PORT_MULTIPLEXER, ERROR_COMM);
+          continue;
+        }
       }
     }
   }
@@ -457,9 +536,11 @@ void responder_handler(void* arguments)
   uint8_t    channel_select = COMM_PORT_A;
   uint32_t   i2c_status;
   uint32_t   request;
+  xTimerStart(responder_timer, portMAX_DELAY);
   for (;;)
   {
     // Wait for an incoming request, either from an interrupt or sotfware timer
+    taskYIELD();
     task_status = xTaskNotifyWait(pdFALSE, 0, &request, portMAX_DELAY);
     // Check if it's a channel-change request
     if (RESPONDER_REQUEST_TDMA == request)
@@ -470,6 +551,8 @@ void responder_handler(void* arguments)
       {
         channel_select = COMM_PORT_A;
       }
+      comm_stack_responder_signal_ready(COMM_PORT_ALL, COMM_PORT_NOT_READY);
+      vTaskDelay(pdMS_TO_TICKS(RESPONDER_SETTLE_TIME_MS));
       // Falling-edge detection / active-low
       comm_stack_responder_signal_ready(channel_select, COMM_PORT_READY);
       continue;
@@ -488,7 +571,7 @@ void responder_handler(void* arguments)
 
             if (pdFALSE == task_status)
             {
-              handle_responder_error(i2c_status, task_status, RESPONDER_ERROR_TIMEOUT);
+              handle_responder_error(i2c_status, task_status, ERROR_TIMEOUT);
             }
             // Set orange: we have a reply, but is it correct
             display_set_rgb(output_channel_led[responder_channel], 255, 128, 0);
@@ -553,10 +636,10 @@ void comm_stack_controller_interrupt_handler(void)
 
 void comm_stack_init(void)
 {
-  comm_message_queue = xQueueCreateStatic(COMM_MESSAGE_QUEUE_MAX_LENGTH,
-                                          sizeof(protocol_message_t),
-                                          comm_message_queue_buffer,
-                                          &comm_message_queue_impl);
+  network_message_queue = xQueueCreateStatic(NETWORK_MESSAGE_QUEUE_MAX_LENGTH,
+                                             sizeof(network_message_t),
+                                             network_message_queue_buffer,
+                                             &network_message_queue_impl);
 
   responder_task = xTaskCreateStatic(responder_handler,
                                      "responder_task",
@@ -575,7 +658,7 @@ void comm_stack_init(void)
                                       &controller_tcb_buffer);
 
   responder_timer = xTimerCreateStatic("restim",
-                                       pdMS_TO_TICKS(RESPONDER_TDMA_PERIOD_MS),
+                                       pdMS_TO_TICKS(RESPONDER_TDMA_PERIOD_MS + RESPONDER_SETTLE_TIME_MS),
                                        pdTRUE,
                                        NULL,
                                        responder_timer_handler,
@@ -587,7 +670,7 @@ void comm_stack_init(void)
   comm_stack_responder_signal_ready(COMM_PORT_ALL, COMM_PORT_NOT_READY);
   for (uint8_t i = 0; i < COMM_PORT_MAX; ++i)
   {
-    display_set_rgb(output_channel_led[i], 255, 0, 0);
-    display_set_rgb(input_channel_led[i], 255, 0, 0);
+    display_set_rgb(output_channel_led[i], 0, 0, 128);
+    display_set_rgb(input_channel_led[i], 0, 0, 128);
   }
 }

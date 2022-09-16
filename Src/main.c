@@ -127,18 +127,11 @@ int main(void)
   MX_TIM22_Init();
   MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
-
   display_init();
-  display_set_rgb(0, 255, 0, 0);
-  display_set_rgb(1, 0, 255, 0);
-  display_set_rgb(2, 0, 0, 255);
-  display_set_rgb(3, 0, 255, 0);
-  display_set_rgb(4, 255, 0, 0);
-  display_set_rgb(5, 0, 255, 0);
-  // comm_stack_init();
-
-  serial_printf("Reset reason: %s", reset_cause_get_name(reset_cause));
-
+  display_clear();
+  display_request_update();
+  serial_printf("\n\r\nReset reason: %s\r\n", reset_cause_get_name(reset_cause));
+  comm_stack_init();
   /* USER CODE END 2 */
 
   MX_FREERTOS_Init();

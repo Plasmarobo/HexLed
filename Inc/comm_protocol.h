@@ -36,19 +36,21 @@ typedef struct
 
 typedef enum
 {
-  COMM_PORT_A    = 0,
-  COMM_PORT_B    = 1,
-  COMM_PORT_C    = 2,
-  COMM_PORT_MAX  = 3,
-  COMM_PORT_NONE = 4,
-  COMM_PORT_ALL  = 5,
+  COMM_PORT_A           = 0,
+  COMM_PORT_B           = 1,
+  COMM_PORT_C           = 2,
+  COMM_PORT_MAX         = 3,
+  COMM_PORT_NONE        = 4,
+  COMM_PORT_ALL         = 5,
+  COMM_PORT_MULTIPLEXER = 6,
 } comm_port_t;
 
 typedef struct
 {
-  comm_port_t        port;
+  comm_port_t        target_port;
+  device_id_t        target_address;
   protocol_message_t message;
-} message_data_t;
+} network_message_t;
 
 typedef enum
 {

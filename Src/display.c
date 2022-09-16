@@ -54,26 +54,21 @@ void display_update_complete_handler(uint8_t error, uintptr_t userdata)
     // Possibly called from ISR
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-    xTaskNotifyFromISR(display_task, TX_INDEX, eSetValueWithoutOverwrite, &xHigherPriorityTaskWoken);
+    xTaskNotifyFromISR(display_task, TX_INDEX, eSetValueWithOverwrite, &xHigherPriorityTaskWoken);
 
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 void display_task_handler(void *argument)
 {
-    uint32_t notification;
-    display_clear();
-    for(;;)
-    {
-      ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-      xSemaphoreTake(display_semaphore, portMAX_DELAY);
-      update_leds(display_update_complete_handler);
-      do
-      {
-        notification = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-      } while (TX_INDEX != notification);
-      xSemaphoreGive(display_semaphore);
-    }
+  for (;;)
+  {
+    xSemaphoreTake(display_semaphore, portMAX_DELAY);
+    update_leds(display_update_complete_handler);
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    xSemaphoreGive(display_semaphore);
+    taskYIELD();
+  }
 }
 
 //------------------------------------

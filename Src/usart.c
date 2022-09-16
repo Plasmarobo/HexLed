@@ -49,20 +49,26 @@ void uart_task_handler(void* args)
   uint16_t bytes_to_send;
   for(;;)
   {
-    xQueueReceive(message_queue,
-                  &message,
-                  portMAX_DELAY);
-    bytes_to_send = strlen(message);
-    if (bytes_to_send > MAX_MESSAGE_CONTENT_LENGTH)
+    if (uxQueueMessagesWaiting(message_queue) > 0)
     {
-      bytes_to_send = MAX_MESSAGE_CONTENT_LENGTH;
+      xQueueReceive(message_queue, &message, portMAX_DELAY);
+      bytes_to_send = strlen(message);
+      if (bytes_to_send > MAX_MESSAGE_CONTENT_LENGTH)
+      {
+        bytes_to_send = MAX_MESSAGE_CONTENT_LENGTH;
+      }
+      if (HAL_OK != HAL_UART_Transmit_IT(&huart1, (uint8_t*)message, bytes_to_send))
+      {
+        // An error sending has occured, drop message and return
+        // TODO: Notify... someone
+        continue;
+      }
+      ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
     }
-    if (HAL_OK != HAL_UART_Transmit_IT(&huart1, (uint8_t*)message, bytes_to_send))
+    else
     {
-      // An error sending has occured, drop message and return
-      // TODO: Notify... someone
+      taskYIELD();
     }
-    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
   }
 }
 
@@ -178,11 +184,14 @@ void USART1_IRQHandler(void)
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
-  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  if (HAL_UART_STATE_BUSY_TX != HAL_UART_GetState(&huart1) && HAL_UART_STATE_BUSY_TX_RX != HAL_UART_GetState(&huart1))
+  {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-  xTaskNotifyFromISR(uart_task, 0, eNoAction, &xHigherPriorityTaskWoken);
+    xTaskNotifyFromISR(uart_task, 0, eNoAction, &xHigherPriorityTaskWoken);
 
-  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+  }
   /* USER CODE END USART1_IRQn 1 */
 }
 

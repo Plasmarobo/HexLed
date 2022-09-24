@@ -1,0 +1,8 @@
+#ifndef PRIORITIES_H
+#define PRIORITIES_H
+
+#define COMM_TASK_STACK_PRIORITY (16)
+#define DISPLAY_TASK_PRIORITY (6)
+#define UART_TASK_PRIORITY (4)
+
+#endif // PRIORITIES_H

@@ -22,9 +22,12 @@
 
 #include "comm_protocol.h"
 
+#include <stdbool.h>
+
 /* USER CODE BEGIN 0 */
 
 #define I2C_DEFAULT_TIMEOUT (2000)
+#define I2C_MASTER_ADDRESS (0x10)
 
 static opt_callback_t     i2c1_rx_callback;
 static opt_callback_t     i2c1_tx_callback;
@@ -54,7 +57,7 @@ void MX_I2C1_Init(void)
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
   hi2c1.Init.Timing = 0x00200B2B;
-  hi2c1.Init.OwnAddress1      = 0x02;
+  hi2c1.Init.OwnAddress1      = I2C_MASTER_ADDRESS;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
   hi2c1.Init.OwnAddress2 = 0;
@@ -67,7 +70,7 @@ void MX_I2C1_Init(void)
   }
   /** Configure Analogue filter
   */
-  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_DISABLE) != HAL_OK)
   {
     Error_Handler();
   }
@@ -82,6 +85,7 @@ void MX_I2C1_Init(void)
   /* USER CODE END I2C1_Init 2 */
 
 }
+
 /* I2C2 init function */
 void MX_I2C2_Init(void)
 {
@@ -100,16 +104,16 @@ void MX_I2C2_Init(void)
   hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c2.Init.DualAddressMode  = I2C_DUALADDRESS_ENABLED;
   hi2c2.Init.OwnAddress2      = COMM_PROTOCOL_MASK_ADDRESS;
-  hi2c2.Init.OwnAddress2Masks = I2C_OA2_MASK01;
-  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_ENABLE;
-  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_ENABLE;
+  hi2c2.Init.OwnAddress2Masks = I2C_OA2_MASK01; // Mask lowest address bit
+  hi2c2.Init.GeneralCallMode  = I2C_GENERALCALL_DISABLE;
+  hi2c2.Init.NoStretchMode    = I2C_NOSTRETCH_DISABLE;
   if (HAL_I2C_Init(&hi2c2) != HAL_OK)
   {
     Error_Handler();
   }
   /** Configure Analogue filter
   */
-  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c2, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c2, I2C_ANALOGFILTER_DISABLE) != HAL_OK)
   {
     Error_Handler();
   }
@@ -129,7 +133,6 @@ void MX_I2C2_Init(void)
   i2c2_address_callback = NULL;
   i2c2_listen_callback  = NULL;
   /* USER CODE END I2C2_Init 2 */
-
 }
 
 void HAL_I2C_MspInit(I2C_HandleTypeDef* i2cHandle)
@@ -256,7 +259,7 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* i2cHandle)
     __HAL_LINKDMA(i2cHandle,hdmatx,hdma_i2c2_tx);
 
     /* I2C2 interrupt Init */
-    HAL_NVIC_SetPriority(I2C2_IRQn, 3, 0);
+    HAL_NVIC_SetPriority(I2C2_IRQn, 3, 1);
     HAL_NVIC_EnableIRQ(I2C2_IRQn);
   /* USER CODE BEGIN I2C2_MspInit 1 */
 
@@ -371,6 +374,7 @@ void HAL_I2C_ListenCpltCallback(I2C_HandleTypeDef* hi2c)
   if ((hi2c == &hi2c2) && (NULL != i2c2_listen_callback))
   {
     i2c2_listen_callback(I2C_SUCCESS, 0);
+    HAL_I2C_EnableListen_IT(hi2c);
   }
 }
 
@@ -454,37 +458,42 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef* hi2c)
   }
 }
 
-void i2c1_send(uint16_t address, uint8_t* buffer, uint32_t length, opt_callback_t cb)
+void HAL_I2C_ErrorCallback(I2C_HandleTypeDef* hi2c)
 {
+  if (hi2c == &hi2c2)
+  {
+    HAL_I2C_EnableListen_IT(hi2c);
+  }
+}
+
+int i2c1_send(uint16_t address, uint8_t* buffer, uint32_t length, opt_callback_t cb)
+{
+
   if (HAL_OK == HAL_I2C_Master_Transmit_DMA(&hi2c1, address, buffer, length))
   {
     i2c1_tx_callback = cb;
   }
   else
   {
-    if (NULL != cb)
-    {
-      cb(I2C_ERROR, 0);
-    }
+    return I2C_ERROR;
   }
+  return I2C_SUCCESS;
 }
 
-void i2c2_send(uint8_t* buffer, uint32_t length, opt_callback_t cb)
+int i2c2_send(uint8_t* buffer, uint32_t length, opt_callback_t cb)
 {
-  if (HAL_OK == HAL_I2C_Slave_Transmit_DMA(&hi2c2, buffer, length))
+  if (HAL_OK == HAL_I2C_Slave_Sequential_Transmit_DMA(&hi2c2, buffer, length, I2C_LAST_FRAME))
   {
     i2c2_tx_callback = cb;
   }
   else
   {
-    if (NULL != cb)
-    {
-      cb(I2C_ERROR, 0);
-    }
+    return I2C_ERROR;
   }
+  return I2C_SUCCESS;
 }
 
-void i2c1_receive(uint16_t address, uint8_t* buffer, uint32_t max_length, opt_callback_t cb)
+int i2c1_receive(uint16_t address, uint8_t* buffer, uint32_t max_length, opt_callback_t cb)
 {
   if (HAL_OK == HAL_I2C_Master_Receive_DMA(&hi2c1, address, buffer, max_length))
   {
@@ -492,26 +501,23 @@ void i2c1_receive(uint16_t address, uint8_t* buffer, uint32_t max_length, opt_ca
   }
   else
   {
-    if (NULL != cb)
-    {
-      cb(I2C_ERROR, 0);
-    }
+    return I2C_ERROR;
   }
+  return I2C_SUCCESS;
 }
 
-void i2c2_receive(uint8_t* buffer, uint32_t max_length, opt_callback_t cb)
+int i2c2_receive(uint8_t* buffer, uint32_t max_length, opt_callback_t cb)
 {
-  if (HAL_OK == HAL_I2C_Slave_Receive_DMA(&hi2c2, buffer, max_length))
+
+  if (HAL_OK == HAL_I2C_Slave_Sequential_Receive_DMA(&hi2c2, buffer, max_length, I2C_LAST_FRAME))
   {
     i2c2_rx_callback = cb;
   }
   else
   {
-    if (NULL != cb)
-    {
-      cb(I2C_ERROR, 0);
-    }
+    return I2C_ERROR;
   }
+  return I2C_SUCCESS;
 }
 
 void i2c2_set_address_callback(address_callback_t cb)

@@ -86,7 +86,8 @@ Src/reset_info.c \
 Src/comm_stack.c \
 Src/comm_protocol.c \
 Src/serial_output.c \
-Src/fast_hsv2rgb_32bit.c
+Src/fast_hsv2rgb_32bit.c \
+Src/TCA9544APWR.c
 
 # ASM sources
 ASM_SOURCES =  \

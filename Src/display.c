@@ -5,6 +5,7 @@
 
 #include "fast_hsv2rgb.h"
 #include "leds.h"
+#include "priorities.h"
 #include "semphr.h"
 #include "task.h"
 #include "timers.h"
@@ -33,7 +34,6 @@
 //------------------------------------
 
 #define DISPLAY_TASK_STACK_SIZE (configMINIMAL_STACK_SIZE * 4)
-#define DISPLAY_TASK_PRIORITY (6)
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/

@@ -21,14 +21,14 @@
 #include "usart.h"
 
 #include "FreeRTOS.h"
-#include "task.h"
+#include "priorities.h"
 #include "queue.h"
+#include "task.h"
 
 #include <string.h>
 
 /* USER CODE BEGIN 0 */
 #define UART_TASK_STACK_SIZE (configMINIMAL_STACK_SIZE * 8)
-#define UART_TASK_PRIORITY (4)
 // 63 characters + null terminator
 
 /* USER CODE END 0 */
@@ -200,6 +200,14 @@ void send_message(const char* message)
   xQueueSendToBack(message_queue,
                    message,
                    pdMS_TO_TICKS(100));
+}
+
+void flush_messages(void)
+{
+  while (uxQueueMessagesWaiting(message_queue) > 0)
+  {
+    taskYIELD();
+  }
 }
 /* USER CODE END 1 */
 

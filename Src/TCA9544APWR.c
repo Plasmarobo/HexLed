@@ -1,100 +1,93 @@
 
 #include "TCA9544APWR.h"
 
-#include "comm_stack.h"
+#include "comm_protocol.h"
+#include "i2c.h"
+#include "opt_prototypes.h"
 
-#define CHANNEL0_SELECT (0x00)
-#define CHANNEL1_SELECT (0x01)
-#define CHANNEL2_SELECT (0x02)
-#define CHANNEL3_SELECT (0x03)
-#define CHANNEL_ENABLE (0x04)
+#include <stdint.h>
+
+#define CONTROL_REG_LENGTH (1)
 
 // Lower bits are not fixed, but we've tied them to ground in Rev2
-#define MUX_ADDRESS (0x70)
-#define MULTIPLEXER_TASK_STACK_SIZE (configMINIMAL_STACK_SIZE * 2)
-#define MULTIPLEXER_TASK_PRIORITY (12)
+#define MULTIPLEXER_ADDRESS (0xE0)
 
-static StackType_t stack_buffer[MULTIPLEXER_TASK_STACK_SIZE];
-static StaticTask_t tcb_buffer;
-static TaskHandle_t multiplexer_task;
-
-typedef enum
-{
-    MP_SETUP = 0,
-    MP_IDLE,
-    MP_CHANNEL_SELECT,
-    MP_SEND,
-    MP_LISTEN,
-    MP_RESET,
-}
-multiplexer_state_t;
-
-typedef struct
-{
-    uint8_t int3 : 1;
-    uint8_t int2 : 1;
-    uint8_t int1 : 1;
-    uint8_t int0 : 1;
-    uint8_t reserved : 1;
-    uint8_t channel_en : 1;
-    uint8_t channel_sel : 2;
-}
-control_register_t;
+static uint8_t        selected_channel;
+static uint8_t        control_reg;
+static opt_callback_t cb_cache;
 
 // Private functions
-int read_control_register(void);
-int select_channel(uint8_t subchannel);
-void multiplexer_task_handler(void *argument);
-
-// Public Interface
-int i2c_multiplexer_init(void)
+void mp_i2c_callback(uint8_t err, uintptr_t userdata)
 {
-    // Start task
-    multiplexer_task = xTaskCreateStatic(multiplexer_task_handler,
-                                        "multiplexer_task",
-                                        MULTIPLEXER_TASK_STACK_SIZE,
-                                        NULL,
-                                        MULTIPLEXER_TASK_PRIORITY,
-                                        stack_buffer,
-                                        &tcb_buffer);
+  UNUSED(userdata);
+  if (I2C_SUCCESS != err)
+  {
+    selected_channel = 0;
+  }
+  if (NULL != cb_cache)
+  {
+    cb_cache(err, 0);
+  }
+  cb_cache = NULL;
 }
 
-int send_to_subchannel(int subchannel, uint16_t tx_len, uint8_t* data, i2c_callback_t reply_cb)
-{
+// Public functions
 
-    int status = read_control_register();
-    if (I2C_SUCCESS != status)
+int set_channel(comm_port_t channel, opt_callback_t cb)
+{
+  if (NULL == cb_cache)
+  {
+    // Translate channel to enable mask
+    uint8_t cmd = CHANNEL_ENABLE;
+    switch (channel)
     {
-
+      case COMM_PORT_A:
+        cmd |= CHANNEL0_SELECT;
+        break;
+      case COMM_PORT_B:
+        cmd |= CHANNEL1_SELECT;
+        break;
+      case COMM_PORT_C:
+        cmd |= CHANNEL2_SELECT;
+        break;
+      default:
+        break;
     }
-    status = select_channel(subchannel);
-    if (I2C_SUCCESS != status)
-    {
-        return status;
-    }
-
+    cb_cache         = cb;
+    selected_channel = channel;
+    return i2c1_send(MULTIPLEXER_ADDRESS, &cmd, CONTROL_REG_LENGTH, mp_i2c_callback);
+  }
+  return 0;
 }
 
-int read_control_register(void)
+int clear_channel(opt_callback_t cb)
 {
-
+  if (NULL == cb_cache)
+  {
+    selected_channel = 0;
+    cb_cache         = cb;
+    return i2c1_send(MULTIPLEXER_ADDRESS, &selected_channel, CONTROL_REG_LENGTH, mp_i2c_callback);
+  }
+  return 0;
 }
 
-int select_channel(void)
+uint8_t get_selected_channel(void)
 {
-
+  return selected_channel;
 }
 
-void multiplexer_task_handler(void* argument)
-{    
-    static control_register_t control_reg;
-    static multiplexer_state_t state = MP_SETUP;
-    for(;;)
-    {
-        control_reg = read_control_register();
-        switch(state)
-        {
+int update_channel_status(opt_callback_t cb)
+{
+  if (NULL == cb_cache)
+  {
+    cb_cache = cb;
+    return i2c1_receive(MULTIPLEXER_ADDRESS, &control_reg, CONTROL_REG_LENGTH, mp_i2c_callback);
+  }
+  return 0;
+}
 
-        }
-    }
+uint8_t get_channel_status(void)
+{
+  // We only care about channels 0, 1, and 2
+  return control_reg & CHANNEL_STATUS_MASK;
 }

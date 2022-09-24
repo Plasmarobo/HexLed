@@ -50,6 +50,7 @@ void MX_USART1_UART_Init(void);
  * @note May block if the UART is busy
  */
 void send_message(const char* msg);
+void flush_messages(void);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

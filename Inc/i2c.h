@@ -29,35 +29,37 @@ extern "C" {
 
 /* USER CODE BEGIN Includes */
 #include "opt_prototypes.h"
-/* USER CODE END Includes */
 
-extern I2C_HandleTypeDef hi2c1;
-extern I2C_HandleTypeDef hi2c2;
+#include <stdbool.h>
+  /* USER CODE END Includes */
 
-/* USER CODE BEGIN Private defines */
+  extern I2C_HandleTypeDef hi2c1;
+  extern I2C_HandleTypeDef hi2c2;
+
+  /* USER CODE BEGIN Private defines */
 
 #define I2C_SUCCESS (0)
-#define I2C_ERROR (1)
+#define I2C_ERROR (-1)
 
-typedef void (*address_callback_t)(uint8_t, uint16_t);
+  typedef void (*address_callback_t)(uint8_t, uint16_t);
 
-/* USER CODE END Private defines */
+  /* USER CODE END Private defines */
 
-void MX_I2C1_Init(void);
-void MX_I2C2_Init(void);
-void I2C1_EV_IRQHandler(void);
-void I2C1_ER_IRQHandler(void);
+  void MX_I2C1_Init(void);
+  void MX_I2C2_Init(void);
+  void I2C1_EV_IRQHandler(void);
+  void I2C1_ER_IRQHandler(void);
 
-/* USER CODE BEGIN Prototypes */
-void i2c1_send(uint16_t address, uint8_t* buffer, uint32_t length, opt_callback_t cb);
-void i2c2_send(uint8_t* buffer, uint32_t length, opt_callback_t cb);
+  /* USER CODE BEGIN Prototypes */
+  int i2c1_send(uint16_t address, uint8_t* buffer, uint32_t length, opt_callback_t cb);
+  int i2c2_send(uint8_t* buffer, uint32_t length, opt_callback_t cb);
 
-void i2c1_receive(uint16_t address, uint8_t* buffer, uint32_t max_length, opt_callback_t cb);
-void i2c2_receive(uint8_t* buffer, uint32_t max_length, opt_callback_t cb);
+  int i2c1_receive(uint16_t address, uint8_t* buffer, uint32_t max_length, opt_callback_t cb);
+  int i2c2_receive(uint8_t* buffer, uint32_t max_length, opt_callback_t cb);
 
-void i2c2_set_address_callback(address_callback_t cb);
-void i2c2_set_listen_callback(opt_callback_t cb);
-/* USER CODE END Prototypes */
+  void i2c2_set_address_callback(address_callback_t cb);
+  void i2c2_set_listen_callback(opt_callback_t cb);
+  /* USER CODE END Prototypes */
 
 #ifdef __cplusplus
 }

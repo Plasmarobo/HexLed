@@ -1,31 +1,24 @@
+/* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file    usart.c
-  * @brief   This file provides code for the configuration
-  *          of the USART instances.
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2022 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under Ultimate Liberty license
-  * SLA0044, the "License"; You may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at:
-  *                             www.st.com/SLA0044
-  *
-  ******************************************************************************
-  */
-
+ ******************************************************************************
+ * @file    usart.c
+ * @brief   This file provides code for the configuration
+ *          of the USART instances.
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2022 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
+/* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "usart.h"
-
-#include "FreeRTOS.h"
-#include "priorities.h"
-#include "queue.h"
-#include "task.h"
-
-#include <string.h>
 
 /* USER CODE BEGIN 0 */
 #define UART_TASK_STACK_SIZE (configMINIMAL_STACK_SIZE * 8)
@@ -34,43 +27,6 @@
 /* USER CODE END 0 */
 
 UART_HandleTypeDef huart1;
-
-static StaticQueue_t message_queue_impl;
-static uint8_t message_queue_buffer[MAX_MESSAGE_CONTENT_LENGTH * MAX_MESSAGE_QUEUE_LENGTH];
-static QueueHandle_t message_queue;
-
-static StackType_t stack_buffer[UART_TASK_STACK_SIZE];
-static StaticTask_t tcb_buffer;
-static TaskHandle_t uart_task;
-
-void uart_task_handler(void* args)
-{
-  char message[MAX_MESSAGE_CONTENT_LENGTH];
-  uint16_t bytes_to_send;
-  for(;;)
-  {
-    if (uxQueueMessagesWaiting(message_queue) > 0)
-    {
-      xQueueReceive(message_queue, &message, portMAX_DELAY);
-      bytes_to_send = strlen(message);
-      if (bytes_to_send > MAX_MESSAGE_CONTENT_LENGTH)
-      {
-        bytes_to_send = MAX_MESSAGE_CONTENT_LENGTH;
-      }
-      if (HAL_OK != HAL_UART_Transmit_IT(&huart1, (uint8_t*)message, bytes_to_send))
-      {
-        // An error sending has occured, drop message and return
-        // TODO: Notify... someone
-        continue;
-      }
-      ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-    }
-    else
-    {
-      taskYIELD();
-    }
-  }
-}
 
 /* USART1 init function */
 
@@ -99,31 +55,18 @@ void MX_USART1_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART1_Init 2 */
-  message_queue = xQueueCreateStatic(MAX_MESSAGE_QUEUE_LENGTH,
-                                     MAX_MESSAGE_CONTENT_LENGTH,
-                                     message_queue_buffer,
-                                     &message_queue_impl);
-
-  uart_task = xTaskCreateStatic(uart_task_handler,
-                                "uart_task",
-                                UART_TASK_STACK_SIZE,
-                                NULL,
-                                UART_TASK_PRIORITY,
-                                stack_buffer,
-                                &tcb_buffer);
   /* USER CODE END USART1_Init 2 */
-
 }
 
 void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
 {
 
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-  if(uartHandle->Instance==USART1)
+  GPIO_InitTypeDef GPIO_InitStruct = { 0 };
+  if (uartHandle->Instance == USART1)
   {
-  /* USER CODE BEGIN USART1_MspInit 0 */
+    /* USER CODE BEGIN USART1_MspInit 0 */
 
-  /* USER CODE END USART1_MspInit 0 */
+    /* USER CODE END USART1_MspInit 0 */
     /* USART1 clock enable */
     __HAL_RCC_USART1_CLK_ENABLE();
 
@@ -132,10 +75,10 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     PB6     ------> USART1_TX
     PB7     ------> USART1_RX
     */
-    GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Pin       = GPIO_PIN_6 | GPIO_PIN_7;
+    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull      = GPIO_NOPULL;
+    GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF0_USART1;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
@@ -143,7 +86,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     HAL_NVIC_SetPriority(USART1_IRQn, 3, 0);
     HAL_NVIC_EnableIRQ(USART1_IRQn);
     /* USER CODE BEGIN USART1_MspInit 1 */
-    
+
     /* USER CODE END USART1_MspInit 1 */
   }
 }
@@ -174,41 +117,5 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 }
 
 /* USER CODE BEGIN 1 */
-/**
-  * @brief This function handles USART1 global interrupt / USART1 wake-up interrupt through EXTI line 25.
-  */
-void USART1_IRQHandler(void)
-{
-  /* USER CODE BEGIN USART1_IRQn 0 */
 
-  /* USER CODE END USART1_IRQn 0 */
-  HAL_UART_IRQHandler(&huart1);
-  /* USER CODE BEGIN USART1_IRQn 1 */
-  if (HAL_UART_STATE_BUSY_TX != HAL_UART_GetState(&huart1) && HAL_UART_STATE_BUSY_TX_RX != HAL_UART_GetState(&huart1))
-  {
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-    xTaskNotifyFromISR(uart_task, 0, eNoAction, &xHigherPriorityTaskWoken);
-
-    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-  }
-  /* USER CODE END USART1_IRQn 1 */
-}
-
-void send_message(const char* message)
-{
-  xQueueSendToBack(message_queue,
-                   message,
-                   pdMS_TO_TICKS(100));
-}
-
-void flush_messages(void)
-{
-  while (uxQueueMessagesWaiting(message_queue) > 0)
-  {
-    taskYIELD();
-  }
-}
 /* USER CODE END 1 */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

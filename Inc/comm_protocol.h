@@ -37,6 +37,7 @@ typedef struct
 typedef enum
 {
   COMM_PORT_A           = 0,
+  COMM_PORT_MIN         = COMM_PORT_A,
   COMM_PORT_B           = 1,
   COMM_PORT_C           = 2,
   COMM_PORT_MAX         = 3,

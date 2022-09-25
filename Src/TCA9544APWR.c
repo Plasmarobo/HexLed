@@ -17,7 +17,7 @@ static uint8_t        control_reg;
 static opt_callback_t cb_cache;
 
 // Private functions
-void mp_i2c_callback(uint8_t err, uintptr_t userdata)
+void mp_i2c_callback(int32_t err, uintptr_t userdata)
 {
   UNUSED(userdata);
   if (I2C_SUCCESS != err)

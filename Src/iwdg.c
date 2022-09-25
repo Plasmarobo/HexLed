@@ -1,37 +1,37 @@
+/* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file    iwdg.c
-  * @brief   This file provides code for the configuration
-  *          of the IWDG instances.
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2022 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under Ultimate Liberty license
-  * SLA0044, the "License"; You may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at:
-  *                             www.st.com/SLA0044
-  *
-  ******************************************************************************
-  */
-
+ ******************************************************************************
+ * @file    iwdg.c
+ * @brief   This file provides code for the configuration
+ *          of the IWDG instances.
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2022 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
+/* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "iwdg.h"
 
+/* USER CODE BEGIN 0 */
 #include "FreeRTOS.h"
 #include "timers.h"
 
-/* USER CODE BEGIN 0 */
+TimerHandle_t watchdog_timer_id;
+StaticTimer_t watchdog_timer;
 
 static void reload_watchdog(TimerHandle_t tm);
 
 /* USER CODE END 0 */
 
 IWDG_HandleTypeDef hiwdg;
-TimerHandle_t watchdog_timer_id;
-StaticTimer_t watchdog_timer;
 
 /* IWDG init function */
 void MX_IWDG_Init(void)
@@ -49,26 +49,19 @@ void MX_IWDG_Init(void)
 	}
 	
   /* USER CODE END IWDG_Init 1 */
-  hiwdg.Instance = IWDG;
-  // Aproximately 500ms for watchdog timeout
+  hiwdg.Instance       = IWDG;
   hiwdg.Init.Prescaler = IWDG_PRESCALER_32;
-  hiwdg.Init.Window = 4095; // Windowed mode disabled
-  hiwdg.Init.Reload = 4095; 
-  if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
+  hiwdg.Init.Window    = 4095;
+  hiwdg.Init.Reload    = 4095;
+  /*if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
   {
     Error_Handler();
-  }
+  }*/
   /* USER CODE BEGIN IWDG_Init 2 */
 
   // Start a thread to pet the watchdog
-  
-  watchdog_timer_id = xTimerCreateStatic(
-    "watchdog_timer",
-    pdMS_TO_TICKS(1000),
-    pdTRUE,
-    0,
-    reload_watchdog,
-    &watchdog_timer);
+
+  watchdog_timer_id = xTimerCreateStatic("watchdog_timer", pdMS_TO_TICKS(500), pdTRUE, 0, reload_watchdog, &watchdog_timer);
 
   if (NULL != watchdog_timer_id)
   {
@@ -84,8 +77,6 @@ void MX_IWDG_Init(void)
 static void reload_watchdog(TimerHandle_t tm)
 {
   UNUSED(tm);
-	HAL_IWDG_Refresh(&hiwdg);
+  // HAL_IWDG_Refresh(&hiwdg);
 }
 /* USER CODE END 1 */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

@@ -453,8 +453,13 @@ osThreadId_t osThreadNew (osThreadFunc_t func, void *argument, const osThreadAtt
     }
 
     assert(mem == 1);
-    hTask = xTaskCreateStatic ((TaskFunction_t)func, name, stack, argument, prio, (StackType_t  *)attr->stack_mem,
-                                                                                    (StaticTask_t *)attr->cb_mem);
+    hTask = xTaskCreateStatic((TaskFunction_t)func,
+                              name,
+                              stack,
+                              argument,
+                              prio,
+                              (StackType_t*)attr->stack_mem,
+                              (StaticTask_t*)attr->cb_mem);
   }
 
   return ((osThreadId_t)hTask);
@@ -925,7 +930,7 @@ osTimerId_t osTimerNew (osTimerFunc_t func, osTimerType_t type, void *argument, 
       }
 
       assert(mem == 1);
-      hTimer = xTimerCreateStatic (name, 1, reload, callb, TimerCallback, (StaticTimer_t *)attr->cb_mem);
+      hTimer = xTimerCreateStatic(name, 1, reload, callb, TimerCallback, (StaticTimer_t*)attr->cb_mem);
     }
   }
 
@@ -1060,7 +1065,7 @@ osEventFlagsId_t osEventFlagsNew (const osEventFlagsAttr_t *attr) {
     }
 
     assert(mem == 1);
-    hEventGroup = xEventGroupCreateStatic (attr->cb_mem);
+    hEventGroup = xEventGroupCreateStatic(attr->cb_mem);
   }
 
   return ((osEventFlagsId_t)hEventGroup);
@@ -1245,23 +1250,30 @@ osMutexId_t osMutexNew (const osMutexAttr_t *attr) {
       }
 
       assert(mem == 1);
-      if (rmtx != 0U) {
-        hMutex = xSemaphoreCreateRecursiveMutexStatic (attr->cb_mem);
+
+      if (rmtx != 0U)
+      {
+        hMutex = xSemaphoreCreateRecursiveMutexStatic(attr->cb_mem);
       }
-      else {
-        hMutex = xSemaphoreCreateMutexStatic (attr->cb_mem);
+      else
+      {
+        hMutex = xSemaphoreCreateMutexStatic(attr->cb_mem);
       }
 
-      #if (configQUEUE_REGISTRY_SIZE > 0)
-      if (hMutex != NULL) {
-        if (attr != NULL) {
+#if (configQUEUE_REGISTRY_SIZE > 0)
+      if (hMutex != NULL)
+      {
+        if (attr != NULL)
+        {
           name = attr->name;
-        } else {
+        }
+        else
+        {
           name = NULL;
         }
         vQueueAddToRegistry (hMutex, name);
       }
-      #endif
+#endif
 
       if ((hMutex != NULL) && (rmtx != 0U)) {
         hMutex = (SemaphoreHandle_t)((uint32_t)hMutex | 1U);
@@ -1419,8 +1431,8 @@ osSemaphoreId_t osSemaphoreNew (uint32_t max_count, uint32_t initial_count, cons
     if (mem != -1) {
       if (max_count == 1U) {
         assert(mem == 1);
-        hSemaphore = xSemaphoreCreateBinaryStatic ((StaticSemaphore_t *)attr->cb_mem);
-        
+        hSemaphore = xSemaphoreCreateBinaryStatic((StaticSemaphore_t*)attr->cb_mem);
+
         if ((hSemaphore != NULL) && (initial_count != 0U)) {
           if (xSemaphoreGive (hSemaphore) != pdPASS) {
             vSemaphoreDelete (hSemaphore);
@@ -1430,7 +1442,7 @@ osSemaphoreId_t osSemaphoreNew (uint32_t max_count, uint32_t initial_count, cons
       }
       else {
         assert(mem == 1);
-        hSemaphore = xSemaphoreCreateCountingStatic (max_count, initial_count, (StaticSemaphore_t *)attr->cb_mem);
+        hSemaphore = xSemaphoreCreateCountingStatic(max_count, initial_count, (StaticSemaphore_t*)attr->cb_mem);
       }
       
       #if (configQUEUE_REGISTRY_SIZE > 0)
@@ -1587,10 +1599,9 @@ osMessageQueueId_t osMessageQueueNew (uint32_t msg_count, uint32_t msg_size, con
     }
 
     assert(mem == 1);
-    hQueue = xQueueCreateStatic (msg_count, msg_size, attr->mq_mem, attr->cb_mem);
-   
+    hQueue = xQueueCreateStatic(msg_count, msg_size, attr->mq_mem, attr->cb_mem);
 
-    #if (configQUEUE_REGISTRY_SIZE > 0)
+#if (configQUEUE_REGISTRY_SIZE > 0)
     if (hQueue != NULL) {
       if (attr != NULL) {
         name = attr->name;

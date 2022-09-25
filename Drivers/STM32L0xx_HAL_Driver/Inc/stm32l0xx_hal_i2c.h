@@ -678,6 +678,7 @@ HAL_StatusTypeDef HAL_I2C_Slave_Seq_Transmit_DMA(I2C_HandleTypeDef *hi2c, uint8_
                                                  uint32_t XferOptions);
 HAL_StatusTypeDef HAL_I2C_Slave_Seq_Receive_DMA(I2C_HandleTypeDef *hi2c, uint8_t *pData, uint16_t Size,
                                                 uint32_t XferOptions);
+HAL_StatusTypeDef HAL_I2C_DMAStop(I2C_HandleTypeDef* hi2c);
 /**
   * @}
   */

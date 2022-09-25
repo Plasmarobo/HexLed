@@ -49,7 +49,7 @@ static StaticSemaphore_t display_mutex;
 // Private Functions
 //------------------------------------
 
-void display_update_complete_handler(uint8_t error, uintptr_t userdata)
+void display_update_complete_handler(int32_t error, uintptr_t userdata)
 {
     // Possibly called from ISR
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;

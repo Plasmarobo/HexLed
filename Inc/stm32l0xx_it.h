@@ -49,6 +49,9 @@
 /* Exported functions prototypes ---------------------------------------------*/
 void NMI_Handler(void);
 void HardFault_Handler(void);
+void EXTI0_1_IRQHandler(void);
+void EXTI2_3_IRQHandler(void);
+void EXTI4_15_IRQHandler(void);
 void DMA1_Channel2_3_IRQHandler(void);
 void DMA1_Channel4_5_6_7_IRQHandler(void);
 void TIM2_IRQHandler(void);
@@ -65,5 +68,3 @@ void USART1_IRQHandler(void);
 #endif
 
 #endif /* __STM32L0xx_IT_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

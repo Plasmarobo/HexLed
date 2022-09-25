@@ -8,6 +8,6 @@
  * @param status
  * @param userdata
  */
-typedef void (*opt_callback_t)(uint8_t, uintptr_t);
+typedef void (*opt_callback_t)(int32_t, uintptr_t);
 
 #endif // OPT_PROTOTYPES_H

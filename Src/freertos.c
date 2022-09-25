@@ -30,6 +30,7 @@
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
+typedef StaticTask_t osStaticThreadDef_t;
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
@@ -48,12 +49,21 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-static StackType_t stack_buffer[DEFAULT_TASK_STACK_SIZE];
-static StaticTask_t tcb_buffer;
-static TaskHandle_t default_task;
 
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
+osThreadId_t         defaultTaskHandle;
+uint32_t             defaultTaskBuffer[128];
+osStaticThreadDef_t  defaultTaskControlBlock;
+const osThreadAttr_t defaultTask_attributes = {
+  .name       = "defaultTask",
+  .cb_mem     = &defaultTaskControlBlock,
+  .cb_size    = sizeof(defaultTaskControlBlock),
+  .stack_mem  = &defaultTaskBuffer[0],
+  .stack_size = sizeof(defaultTaskBuffer),
+  .priority   = (osPriority_t)osPriorityNormal,
+};
+
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 
@@ -91,15 +101,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the thread(s) */
   /* creation of defaultTask */
-  default_task = xTaskCreateStatic(StartDefaultTask,
-                                        "defaultTask",
-                                        DEFAULT_TASK_STACK_SIZE,
-                                        NULL,
-                                        DEFAULT_TASK_PRIORITY,
-                                        stack_buffer,
-                                        &tcb_buffer);
-
-  vTaskStartScheduler();
+  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -133,5 +135,3 @@ void StartDefaultTask(void *argument)
 /* USER CODE BEGIN Application */
 
 /* USER CODE END Application */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

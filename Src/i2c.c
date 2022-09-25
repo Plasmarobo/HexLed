@@ -1,33 +1,41 @@
+/* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file    i2c.c
-  * @brief   This file provides code for the configuration
-  *          of the I2C instances.
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2022 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under Ultimate Liberty license
-  * SLA0044, the "License"; You may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at:
-  *                             www.st.com/SLA0044
-  *
-  ******************************************************************************
-  */
-
+ ******************************************************************************
+ * @file    i2c.c
+ * @brief   This file provides code for the configuration
+ *          of the I2C instances.
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2022 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
+/* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "i2c.h"
 
-#include "comm_protocol.h"
-
-#include <stdbool.h>
-
 /* USER CODE BEGIN 0 */
 
-#define I2C_DEFAULT_TIMEOUT (2000)
-#define I2C_MASTER_ADDRESS (0x10)
+#include "FreeRTOS.h"
+
+#include "comm_protocol.h"
+#include "task.h"
+#include "timers.h"
+
+#include "assert.h"
+
+#define I2C_DEFAULT_TIMEOUT (250)
+
+TimerHandle_t i2c1_timer_id;
+TimerHandle_t i2c2_timer_id;
+StaticTimer_t i2c1_timer;
+StaticTimer_t i2c2_timer;
 
 static opt_callback_t     i2c1_rx_callback;
 static opt_callback_t     i2c1_tx_callback;
@@ -35,6 +43,10 @@ static opt_callback_t     i2c2_rx_callback;
 static opt_callback_t     i2c2_tx_callback;
 static address_callback_t i2c2_address_callback;
 static opt_callback_t     i2c2_listen_callback;
+
+static void i2c1_handle_timeout(TimerHandle_t tm);
+static void i2c2_handle_timeout(TimerHandle_t tm);
+
 /* USER CODE END 0 */
 
 I2C_HandleTypeDef hi2c1;
@@ -56,8 +68,8 @@ void MX_I2C1_Init(void)
 
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
-  hi2c1.Init.Timing = 0x00200B2B;
-  hi2c1.Init.OwnAddress1      = I2C_MASTER_ADDRESS;
+  hi2c1.Init.Timing           = 0x00200C2D;
+  hi2c1.Init.OwnAddress1      = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
   hi2c1.Init.OwnAddress2 = 0;
@@ -68,12 +80,14 @@ void MX_I2C1_Init(void)
   {
     Error_Handler();
   }
+
   /** Configure Analogue filter
   */
   if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_DISABLE) != HAL_OK)
   {
     Error_Handler();
   }
+
   /** Configure Digital filter
   */
   if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
@@ -83,9 +97,7 @@ void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
-
 }
-
 /* I2C2 init function */
 void MX_I2C2_Init(void)
 {
@@ -97,34 +109,34 @@ void MX_I2C2_Init(void)
   /* USER CODE BEGIN I2C2_Init 1 */
 
   /* USER CODE END I2C2_Init 1 */
-  // We will respond to 0x2E, 0x30, 0x32
-  hi2c2.Instance = I2C2;
-  hi2c2.Init.Timing = 0x00200B2B;
-  hi2c2.Init.OwnAddress1      = COMM_PROTOCOL_BASE_ADDRESS;
-  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c2.Init.DualAddressMode  = I2C_DUALADDRESS_ENABLED;
-  hi2c2.Init.OwnAddress2      = COMM_PROTOCOL_MASK_ADDRESS;
-  hi2c2.Init.OwnAddress2Masks = I2C_OA2_MASK01; // Mask lowest address bit
-  hi2c2.Init.GeneralCallMode  = I2C_GENERALCALL_DISABLE;
-  hi2c2.Init.NoStretchMode    = I2C_NOSTRETCH_DISABLE;
+  hi2c2.Instance              = I2C2;
+  hi2c2.Init.Timing           = 0x00200C2D;
+  hi2c2.Init.OwnAddress1      = (COMM_PROTOCOL_BASE_ADDRESS << 1);
+  hi2c2.Init.AddressingMode   = I2C_ADDRESSINGMODE_7BIT;
+  hi2c2.Init.DualAddressMode  = I2C_DUALADDRESS_ENABLE;
+  hi2c2.Init.OwnAddress2      = (COMM_PROTOCOL_MASK_ADDRESS << 1);
+  hi2c2.Init.OwnAddress2Masks = I2C_OA2_MASK01;
+  hi2c2.Init.GeneralCallMode  = I2C_GENERALCALL_ENABLE;
+  hi2c2.Init.NoStretchMode    = I2C_NOSTRETCH_ENABLE;
   if (HAL_I2C_Init(&hi2c2) != HAL_OK)
   {
     Error_Handler();
   }
+
   /** Configure Analogue filter
-  */
+   */
   if (HAL_I2CEx_ConfigAnalogFilter(&hi2c2, I2C_ANALOGFILTER_DISABLE) != HAL_OK)
   {
     Error_Handler();
   }
+
   /** Configure Digital filter
-  */
+   */
   if (HAL_I2CEx_ConfigDigitalFilter(&hi2c2, 0) != HAL_OK)
   {
     Error_Handler();
   }
   /* USER CODE BEGIN I2C2_Init 2 */
-  HAL_I2C_EnableListen_IT(&hi2c2);
 
   i2c1_rx_callback      = NULL;
   i2c1_tx_callback      = NULL;
@@ -198,9 +210,10 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* i2cHandle)
     /* I2C1 interrupt Init */
     HAL_NVIC_SetPriority(I2C1_IRQn, 3, 0);
     HAL_NVIC_EnableIRQ(I2C1_IRQn);
-  /* USER CODE BEGIN I2C1_MspInit 1 */
-
-  /* USER CODE END I2C1_MspInit 1 */
+    /* USER CODE BEGIN I2C1_MspInit 1 */
+    i2c1_timer_id =
+        xTimerCreateStatic("i2c1_timer", pdMS_TO_TICKS(I2C_DEFAULT_TIMEOUT), pdFALSE, 0, i2c1_handle_timeout, &i2c1_timer);
+    /* USER CODE END I2C1_MspInit 1 */
   }
   else if(i2cHandle->Instance==I2C2)
   {
@@ -259,11 +272,12 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* i2cHandle)
     __HAL_LINKDMA(i2cHandle,hdmatx,hdma_i2c2_tx);
 
     /* I2C2 interrupt Init */
-    HAL_NVIC_SetPriority(I2C2_IRQn, 3, 1);
+    HAL_NVIC_SetPriority(I2C2_IRQn, 3, 0);
     HAL_NVIC_EnableIRQ(I2C2_IRQn);
   /* USER CODE BEGIN I2C2_MspInit 1 */
-
-  /* USER CODE END I2C2_MspInit 1 */
+    i2c2_timer_id =
+        xTimerCreateStatic("i2c2_timer", pdMS_TO_TICKS(I2C_DEFAULT_TIMEOUT), pdFALSE, 0, i2c2_handle_timeout, &i2c2_timer);
+    /* USER CODE END I2C2_MspInit 1 */
   }
 }
 
@@ -324,42 +338,6 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* i2cHandle)
   }
 }
 
-/**
-  * @brief This function handles I2C1 event global interrupt / I2C1 wake-up interrupt through EXTI line 23.
-  */
-void I2C1_IRQHandler(void)
-{
-  /* USER CODE BEGIN I2C1_IRQn 0 */
-
-  /* USER CODE END I2C1_IRQn 0 */
-  if (hi2c1.Instance->ISR & (I2C_FLAG_BERR | I2C_FLAG_ARLO | I2C_FLAG_OVR)) {
-    HAL_I2C_ER_IRQHandler(&hi2c1);
-  } else {
-    HAL_I2C_EV_IRQHandler(&hi2c1);
-  }
-  /* USER CODE BEGIN I2C1_IRQn 1 */
-
-  /* USER CODE END I2C1_IRQn 1 */
-}
-
-/**
-  * @brief This function handles I2C2 global interrupt.
-  */
-void I2C2_IRQHandler(void)
-{
-  /* USER CODE BEGIN I2C2_IRQn 0 */
-
-  /* USER CODE END I2C2_IRQn 0 */
-  if (hi2c2.Instance->ISR & (I2C_FLAG_BERR | I2C_FLAG_ARLO | I2C_FLAG_OVR)) {
-    HAL_I2C_ER_IRQHandler(&hi2c2);
-  } else {
-    HAL_I2C_EV_IRQHandler(&hi2c2);
-  }
-  /* USER CODE BEGIN I2C2_IRQn 1 */
-
-  /* USER CODE END I2C2_IRQn 1 */
-}
-
 /* USER CODE BEGIN 1 */
 void HAL_I2C_AddrCallback(I2C_HandleTypeDef* hi2c, uint8_t direction, uint16_t address_match_code)
 {
@@ -371,17 +349,13 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef* hi2c, uint8_t direction, uint16_t a
 
 void HAL_I2C_ListenCpltCallback(I2C_HandleTypeDef* hi2c)
 {
-  if ((hi2c == &hi2c2) && (NULL != i2c2_listen_callback))
-  {
-    i2c2_listen_callback(I2C_SUCCESS, 0);
-    HAL_I2C_EnableListen_IT(hi2c);
-  }
 }
 
 void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
   if (hi2c == &hi2c1)
   {
+    xTimerStop(i2c1_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c1_tx_callback)
     {
       i2c1_tx_callback(I2C_SUCCESS, 0);
@@ -390,6 +364,7 @@ void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
   }
   else if (hi2c == &hi2c2)
   {
+    xTimerStop(i2c2_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c2_tx_callback)
     {
       i2c2_tx_callback(I2C_SUCCESS, 0);
@@ -402,6 +377,7 @@ void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
   if (hi2c == &hi2c1)
   {
+    xTimerStop(i2c1_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c1_rx_callback)
     {
       i2c1_rx_callback(I2C_SUCCESS, 0);
@@ -410,6 +386,7 @@ void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
   }
   else if (hi2c == &hi2c2)
   {
+    xTimerStop(i2c2_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c2_rx_callback)
     {
       i2c2_rx_callback(I2C_SUCCESS, 0);
@@ -422,6 +399,7 @@ void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
   if (hi2c == &hi2c1)
   {
+    xTimerStop(i2c1_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c1_tx_callback)
     {
       i2c1_tx_callback(I2C_SUCCESS, 0);
@@ -430,6 +408,7 @@ void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c)
   }
   else if (hi2c == &hi2c2)
   {
+    xTimerStop(i2c2_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c2_tx_callback)
     {
       i2c2_tx_callback(I2C_SUCCESS, 0);
@@ -442,6 +421,7 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef* hi2c)
 {
   if (hi2c == &hi2c1)
   {
+    xTimerStop(i2c1_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c1_rx_callback)
     {
       i2c1_rx_callback(I2C_SUCCESS, 0);
@@ -450,6 +430,7 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef* hi2c)
   }
   else if (hi2c == &hi2c2)
   {
+    xTimerStop(i2c2_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c2_rx_callback)
     {
       i2c2_rx_callback(I2C_SUCCESS, 0);
@@ -462,67 +443,140 @@ void HAL_I2C_ErrorCallback(I2C_HandleTypeDef* hi2c)
 {
   if (hi2c == &hi2c2)
   {
-    HAL_I2C_EnableListen_IT(hi2c);
+    if (HAL_OK != HAL_I2C_EnableListen_IT(hi2c))
+    {
+      assert(0);
+    }
   }
 }
 
 int i2c1_send(uint16_t address, uint8_t* buffer, uint32_t length, opt_callback_t cb)
 {
-
-  if (HAL_OK == HAL_I2C_Master_Transmit_DMA(&hi2c1, address, buffer, length))
+  int result = I2C_SUCCESS;
+  taskENTER_CRITICAL();
+  if (NULL != i2c1_timer_id)
   {
-    i2c1_tx_callback = cb;
+    if (HAL_OK == HAL_I2C_Master_Transmit_DMA(&hi2c1, address, buffer, length))
+    {
+      xTimerStart(i2c1_timer_id, pdMS_TO_TICKS(0));
+      i2c1_tx_callback = cb;
+    }
+    else
+    {
+      result = I2C_ERROR;
+    }
   }
-  else
-  {
-    return I2C_ERROR;
-  }
-  return I2C_SUCCESS;
+  taskEXIT_CRITICAL();
+  return result;
 }
 
 int i2c2_send(uint8_t* buffer, uint32_t length, opt_callback_t cb)
 {
-  if (HAL_OK == HAL_I2C_Slave_Sequential_Transmit_DMA(&hi2c2, buffer, length, I2C_LAST_FRAME))
+  int result = I2C_SUCCESS;
+  taskENTER_CRITICAL();
+  if (NULL != i2c2_timer_id)
   {
-    i2c2_tx_callback = cb;
+    if (HAL_OK == HAL_I2C_Slave_Transmit_DMA(&hi2c2, buffer, length))
+    {
+      xTimerStart(i2c2_timer_id, pdMS_TO_TICKS(0));
+      i2c2_tx_callback = cb;
+    }
+    else
+    {
+      result = I2C_ERROR;
+    }
   }
-  else
-  {
-    return I2C_ERROR;
-  }
-  return I2C_SUCCESS;
+  taskEXIT_CRITICAL();
+  return result;
 }
 
 int i2c1_receive(uint16_t address, uint8_t* buffer, uint32_t max_length, opt_callback_t cb)
 {
-  if (HAL_OK == HAL_I2C_Master_Receive_DMA(&hi2c1, address, buffer, max_length))
+  int result = I2C_SUCCESS;
+  taskENTER_CRITICAL();
+  if (NULL != i2c1_timer_id)
   {
-    i2c1_rx_callback = cb;
+    if (HAL_OK == HAL_I2C_Master_Receive_DMA(&hi2c1, address, buffer, max_length))
+    {
+      xTimerStart(i2c1_timer_id, pdMS_TO_TICKS(0));
+      i2c1_rx_callback = cb;
+    }
+    else
+    {
+      result = I2C_ERROR;
+    }
   }
-  else
-  {
-    return I2C_ERROR;
-  }
-  return I2C_SUCCESS;
+  taskEXIT_CRITICAL();
+  return result;
 }
 
 int i2c2_receive(uint8_t* buffer, uint32_t max_length, opt_callback_t cb)
 {
+  int result = I2C_SUCCESS;
+  taskENTER_CRITICAL();
+  if (NULL != i2c2_timer_id)
+  {
+    if (HAL_OK == HAL_I2C_Slave_Receive_DMA(&hi2c2, buffer, max_length))
+    {
+      xTimerStart(i2c2_timer_id, pdMS_TO_TICKS(0));
+      i2c2_rx_callback = cb;
+    }
+    else
+    {
+      result = I2C_ERROR;
+    }
+  }
+  taskEXIT_CRITICAL();
+  return result;
+}
 
-  if (HAL_OK == HAL_I2C_Slave_Sequential_Receive_DMA(&hi2c2, buffer, max_length, I2C_LAST_FRAME))
+void i2c1_handle_timeout(TimerHandle_t tm)
+{
+  UNUSED(tm);
+  taskENTER_CRITICAL();
+  // Abort DMA and report timeout
+  HAL_I2C_DMAStop(&hi2c1);
+  if (NULL != i2c1_tx_callback)
   {
-    i2c2_rx_callback = cb;
+    i2c1_tx_callback(I2C_TIMEOUT, 0);
   }
-  else
+  if (NULL != i2c1_rx_callback)
   {
-    return I2C_ERROR;
+    i2c1_rx_callback(I2C_TIMEOUT, 0);
   }
-  return I2C_SUCCESS;
+  taskEXIT_CRITICAL();
+}
+
+void i2c2_handle_timeout(TimerHandle_t tm)
+{
+  UNUSED(tm);
+  taskENTER_CRITICAL();
+  // Abort DMA and report timeout
+  HAL_I2C_DMAStop(&hi2c2);
+  if (NULL != i2c2_tx_callback)
+  {
+    i2c2_tx_callback(I2C_TIMEOUT, 0);
+  }
+  if (NULL != i2c2_rx_callback)
+  {
+    i2c2_rx_callback(I2C_TIMEOUT, 0);
+  }
+  // Restore listen mode
+  if (HAL_OK != HAL_I2C_EnableListen_IT(&hi2c2))
+  {
+    assert(0);
+  }
+  taskEXIT_CRITICAL();
 }
 
 void i2c2_set_address_callback(address_callback_t cb)
 {
   i2c2_address_callback = cb;
+  // Enable the liste interrupt
+  if (HAL_OK != HAL_I2C_EnableListen_IT(&hi2c2))
+  {
+    assert(0);
+  }
 }
 
 void i2c2_set_listen_callback(opt_callback_t cb)
@@ -531,5 +585,3 @@ void i2c2_set_listen_callback(opt_callback_t cb)
 }
 
 /* USER CODE END 1 */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

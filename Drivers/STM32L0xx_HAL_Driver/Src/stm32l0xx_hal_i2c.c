@@ -2347,6 +2347,47 @@ HAL_StatusTypeDef HAL_I2C_Slave_Receive_DMA(I2C_HandleTypeDef *hi2c, uint8_t *pD
     return HAL_BUSY;
   }
 }
+
+/**
+ * @brief  Stop the DMA Transfer.
+ * @param  hi2c pointer to a I2C_HandleTypeDef structure that contains
+ *               the configuration information for the specified I2C module.
+ * @retval HAL status
+ */
+HAL_StatusTypeDef HAL_I2C_DMAStop(I2C_HandleTypeDef* hi2c)
+{
+  HAL_StatusTypeDef errorcode = HAL_OK;
+  /* The Lock is not implemented on this API to allow the user application
+     to call the HAL SPI API under callbacks HAL_I2C_TxCpltCallback() or HAL_I2C_RxCpltCallback():
+     when calling HAL_DMA_Abort() API the DMA TX/RX Transfer complete interrupt is generated
+     and the correspond call back is executed HAL_I2C_TxCpltCallback() or HAL_I2C_RxCpltCallback()
+     */
+
+  /* Abort the SPI DMA tx Stream/Channel  */
+  if (hi2c->hdmatx != NULL)
+  {
+    if (HAL_OK != HAL_DMA_Abort(hi2c->hdmatx))
+    {
+      SET_BIT(hi2c->ErrorCode, HAL_I2C_ERROR_DMA);
+      errorcode = HAL_ERROR;
+    }
+  }
+  /* Abort the SPI DMA rx Stream/Channel  */
+  if (hi2c->hdmarx != NULL)
+  {
+    if (HAL_OK != HAL_DMA_Abort(hi2c->hdmarx))
+    {
+      SET_BIT(hi2c->ErrorCode, HAL_I2C_ERROR_DMA);
+      errorcode = HAL_ERROR;
+    }
+  }
+
+  /* Disable the I2C DMA Tx & Rx requests */
+  CLEAR_BIT(hi2c->Instance->CR2, I2C_CR1_TXDMAEN | I2C_CR1_RXDMAEN);
+  hi2c->State = HAL_I2C_STATE_READY;
+  return errorcode;
+}
+
 /**
   * @brief  Write an amount of data in blocking mode to a specific memory address
   * @param  hi2c Pointer to a I2C_HandleTypeDef structure that contains

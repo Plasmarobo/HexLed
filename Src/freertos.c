@@ -26,7 +26,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "application.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -123,10 +123,11 @@ void MX_FREERTOS_Init(void) {
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
+  init_application();
   /* Infinite loop */
   for(;;)
   {
-    vTaskDelay(pdMS_TO_TICKS(100UL));
+    update_application();
   }
   /* USER CODE END StartDefaultTask */
 }

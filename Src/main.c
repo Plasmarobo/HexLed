@@ -33,11 +33,7 @@
 /* USER CODE BEGIN Includes */
 #include "FreeRTOS.h"
 
-#include "comm_stack.h"
-#include "display.h"
 #include "reset_info.h"
-#include "serial_output.h"
-#include "timers.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -87,7 +83,7 @@ void MX_FREERTOS_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  reset_cause_t reset_cause = reset_cause_get();
+  save_reset_cause();
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -124,20 +120,16 @@ int main(void)
   MX_I2C2_Init();
   MX_USART1_UART_Init();
   MX_RTC_Init();
-  // MX_SPI2_Init();
+  MX_SPI2_Init();
   MX_TIM22_Init();
   MX_IWDG_Init();
-  /* USER CODE BEGIN 2 */
-  display_init();
-  display_clear();
-  display_request_update();
-  serial_printf("\n\r\nReset reason: %s\r\n", reset_cause_get_name(reset_cause));
-  comm_stack_init();
-  /* USER CODE END 2 */
 
   /* Init scheduler */
   osKernelInitialize(); /* Call init function for freertos objects (in freertos.c) */
   MX_FREERTOS_Init();
+  /* USER CODE BEGIN 2 */
+
+  /* USER CODE END 2 */
 
   /* Start scheduler */
   osKernelStart();

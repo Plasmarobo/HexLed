@@ -14,10 +14,11 @@ typedef enum
     RESET_CAUSE_OPTION_BYTES_RESET,
 } reset_cause_t;
 
-/// @brief      Obtain the STM32 system reset cause
-/// @param      None
-/// @return     The system reset cause
-reset_cause_t reset_cause_get(void);
+/**
+ * @brief Save STM32 reset cause register before it is erased
+ *
+ */
+void save_reset_cause(void);
 
 // Note: any of the STM32 Hardware Abstraction Layer (HAL) Reset and Clock
 // Controller (RCC) header files, such as 
@@ -41,5 +42,11 @@ reset_cause_t reset_cause_get(void);
 /// @return     A null-terminated ASCII name string describing the system 
 ///             reset cause
 const char * reset_cause_get_name(reset_cause_t reset_cause);
+
+/**
+ * @brief Performs a on-boot read-store of the reset reason before it is cleared
+ *
+ */
+reset_cause_t get_reset_cause(void);
 
 #endif // RESET_INFO_H

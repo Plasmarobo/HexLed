@@ -24,6 +24,7 @@
 #define TX_INDEX (1)
 
 #define DISPLAY_MAX_WAIT_MS (100)
+#define DISPLAY_UPDATE_MS (10)
 
 //------------------------------------
 // Type Definition
@@ -67,7 +68,7 @@ void display_task_handler(void *argument)
     update_leds(display_update_complete_handler);
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
     xSemaphoreGive(display_semaphore);
-    taskYIELD();
+    vTaskDelay(pdMS_TO_TICKS(DISPLAY_UPDATE_MS));
   }
 }
 

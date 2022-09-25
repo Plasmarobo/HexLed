@@ -38,6 +38,7 @@ Src/freertos.c \
 Src/stm32l0xx_it.c \
 Src/stm32l0xx_hal_msp.c \
 Src/stm32l0xx_hal_timebase_tim.c \
+Src/application.c \
 Src/gpio.c \
 Src/dma.c \
 Src/i2c.c \

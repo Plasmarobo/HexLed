@@ -22,6 +22,8 @@
 #define COMM_STACK_STARTUP_DELAY_MS (200)
 #define COMM_STACK_MULTIPLEXER_COOLDOWN_MS (200)
 
+#define PEND_TICKS (5)
+
 #define RESPONDER_TDMA_PERIOD_MS (300)
 #define RESPONDER_SETTLE_TIME_MS (50)
 
@@ -176,7 +178,7 @@ void comm_stack_responder_i2c_handler(int32_t err, uintptr_t user)
 {
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-  xTimerPendFunctionCallFromISR(controller_handler, NULL, (uint32_t)err, &xHigherPriorityTaskWoken);
+  xTimerPendFunctionCallFromISR(responder_handler, NULL, (uint32_t)err, &xHigherPriorityTaskWoken);
 
   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
@@ -258,10 +260,11 @@ void controller_handler(void* userdata, uint32_t userdata2)
       target_address                  = 0;
       controller_message_cache.header = 0;
       controller_message_cache.length = 0;
-      if (controller_port > COMM_PORT_MAX)
+      /*if (controller_port > COMM_PORT_MAX)
       {
         controller_port = COMM_PORT_MIN;
-      }
+      }*/
+      controller_port = COMM_PORT_A;
       i2c_status = update_channel_status(comm_stack_controller_i2c_handler);
       if (I2C_SUCCESS == i2c_status)
       {
@@ -270,7 +273,7 @@ void controller_handler(void* userdata, uint32_t userdata2)
       else
       {
         controller_state = CONTROLLER_ERROR;
-        xTimerPendFunctionCall(controller_handler, NULL, (uint32_t)i2c_status, pdMS_TO_TICKS(0));
+        xTimerPendFunctionCall(controller_handler, NULL, (uint32_t)i2c_status, PEND_TICKS);
       }
       break;
     case CONTROLLER_READ_INTERRUPTS:
@@ -287,7 +290,7 @@ void controller_handler(void* userdata, uint32_t userdata2)
       if (I2C_SUCCESS != i2c_status)
       {
         controller_state = CONTROLLER_ERROR;
-        xTimerPendFunctionCall(controller_handler, NULL, (uint32_t)i2c_status, pdMS_TO_TICKS(0));
+        xTimerPendFunctionCall(controller_handler, NULL, (uint32_t)i2c_status, PEND_TICKS);
       }
       break;
     case CONTROLLER_SET_CHANNEL:
@@ -311,7 +314,7 @@ void controller_handler(void* userdata, uint32_t userdata2)
       if (I2C_SUCCESS != i2c_status)
       {
         controller_state = CONTROLLER_ERROR;
-        xTimerPendFunctionCall(controller_handler, NULL, (uint32_t)i2c_status, pdMS_TO_TICKS(0));
+        xTimerPendFunctionCall(controller_handler, NULL, (uint32_t)i2c_status, PEND_TICKS);
       }
       break;
     case CONTROLLER_DETECT_TARGET:
@@ -339,7 +342,7 @@ void controller_handler(void* userdata, uint32_t userdata2)
         {
           controller_state = CONTROLLER_SET_CHANNEL;
         }
-        xTimerPendFunctionCall(controller_handler, NULL, (uint32_t)i2c_status, pdMS_TO_TICKS(0));
+        xTimerPendFunctionCall(controller_handler, NULL, (uint32_t)i2c_status, PEND_TICKS);
       }
       break;
     case CONTROLLER_QUERY_TARGET_HEADER:
@@ -371,7 +374,7 @@ void controller_handler(void* userdata, uint32_t userdata2)
       if (I2C_SUCCESS != i2c_status)
       {
         controller_state = CONTROLLER_ERROR;
-        xTimerPendFunctionCall(controller_handler, NULL, (uint32_t)i2c_status, pdMS_TO_TICKS(0));
+        xTimerPendFunctionCall(controller_handler, NULL, (uint32_t)i2c_status, PEND_TICKS);
       }
       break;
     case CONTROLLER_QUERY_TARGET_DATA:
@@ -396,16 +399,19 @@ void controller_handler(void* userdata, uint32_t userdata2)
       {
         controller_state = CONTROLLER_ERROR;
       }
-      xTimerPendFunctionCall(controller_handler, NULL, (uint32_t)i2c_status, pdMS_TO_TICKS(0));
+      xTimerPendFunctionCall(controller_handler, NULL, (uint32_t)i2c_status, PEND_TICKS);
       break;
     case CONTROLLER_CLEAR_CHANNEL:
       break;
     case CONTROLLER_ERROR:
       // Report error
       handle_controller_error(i2c_status, controller_message_cache.header, controller_port);
-      // controller_state = CONTROLLER_IDLE;
+      controller_state = CONTROLLER_IDLE;
+      xTimerPendFunctionCall(controller_handler, NULL, (uint32_t)i2c_status, PEND_TICKS);
       break;
-    default:
+    default:  
+      controller_state = CONTROLLER_IDLE;
+      xTimerPendFunctionCall(controller_handler, NULL, (uint32_t)i2c_status, PEND_TICKS);
       break;
   }
 }
@@ -547,7 +553,7 @@ void comm_stack_init(void)
     display_set_rgb(input_channel_led[i], 0, 0, 128);
   }
   xTimerPendFunctionCall(controller_handler, NULL, I2C_SUCCESS, pdMS_TO_TICKS(COMM_STACK_STARTUP_DELAY_MS));
-  xTimerPendFunctionCall(responder_handler, NULL, I2C_SUCCESS, pdMS_TO_TICKS(COMM_STACK_STARTUP_DELAY_MS));
+  xTimerPendFunctionCall(responder_handler, NULL, I2C_SUCCESS, pdMS_TO_TICKS(0));
 }
 
 void exec_external_command(protocol_message_t command_packet)

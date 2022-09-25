@@ -101,16 +101,19 @@ int main(void)
   /* USER CODE BEGIN SysInit */
 
   // Configure debug registers
+  #ifdef DEBUG
   DBGMCU->APB2FZ |= DBGMCU_APB2_FZ_DBG_TIM21_STOP;   // disable PWM outputs on debug stop
   DBGMCU->APB2FZ |= DBGMCU_APB2_FZ_DBG_TIM22_STOP;
   DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_TIM2_STOP;  // freeze TIM2 on debug stop
   DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_LPTIMER_STOP;  // freeze TIM6 on debug stop
-  DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_RTC_STOP;  // freeze TIM7 on debug stop
-  // DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_I2C2_STOP;
-  // DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_I2C1_STOP;
-
+  //DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_RTC_STOP;  // freeze TIM7 on debug stop
+  //DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_I2C2_STOP;
+  //DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_I2C1_STOP;
+  
   __HAL_RCC_DBGMCU_CLK_ENABLE();
   __HAL_DBGMCU_FREEZE_IWDG();
+  #endif
+  
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */

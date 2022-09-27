@@ -14,6 +14,7 @@
 
 static uint8_t        selected_channel;
 static uint8_t        control_reg;
+static uint8_t        cmd;
 static opt_callback_t cb_cache;
 
 // Private functions
@@ -38,7 +39,7 @@ int set_channel(comm_port_t channel, opt_callback_t cb)
   if (NULL == cb_cache)
   {
     // Translate channel to enable mask
-    uint8_t cmd = CHANNEL_ENABLE;
+    cmd = CHANNEL_ENABLE;
     switch (channel)
     {
       case COMM_PORT_A:

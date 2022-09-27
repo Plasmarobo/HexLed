@@ -47,9 +47,9 @@
 
 typedef enum
 {
-  RESPONDER_REQUEST_TDMA = 0,
-  RESPONDER_REQUEST_READ,
-  RESPONDER_REQUEST_WRITE,
+  RESPONDER_REQUEST_WRITE, // Must match i2c write code!
+  RESPONDER_REQUEST_READ, // Must match i2c read code!
+  RESPONDER_REQUEST_TDMA,
   RESPONDER_TRANSACTION_COMPLETE,
   RESPONDER_REQUEST_MAX,
 } responder_request_t;
@@ -184,8 +184,14 @@ void comm_stack_responder_i2c_handler(int32_t err, uintptr_t user)
 }
 
 // Handles the i2c address match
-void comm_stack_responder_listen_handler(void)
+void comm_stack_responder_listen_handler(uint8_t err, uint16_t addr)
 {
+   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+  //xTimerPendFunctionCallFromISR(responder_handler, NULL, (uint32_t)err, &xHigherPriorityTaskWoken);
+  xTimerPendFunctionCall(responder_handler, NULL, (uint32_t)err, 1);
+
+  //portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 // Periodically requests that we signal a new channel active
@@ -370,6 +376,10 @@ void controller_handler(void* userdata, uint32_t userdata2)
             controller_state = CONTROLLER_QUERY_TARGET_DATA;
           }
         }
+        else
+        {
+          controller_state = CONTROLLER_IDLE;
+        }
       }
       if (I2C_SUCCESS != i2c_status)
       {
@@ -514,7 +524,7 @@ void responder_handler(void* userdata, uint32_t userdata2)
     {
       handle_responder_error(i2c_status, responder_message_cache.header);
       i2c2_set_address_callback(handle_i2c2_address);
-      // responder_state = RESPONDER_LISTEN;
+      responder_state = RESPONDER_LISTEN;
     }
     break;
     default:
@@ -553,7 +563,8 @@ void comm_stack_init(void)
     display_set_rgb(input_channel_led[i], 0, 0, 128);
   }
   xTimerPendFunctionCall(controller_handler, NULL, I2C_SUCCESS, pdMS_TO_TICKS(COMM_STACK_STARTUP_DELAY_MS));
-  xTimerPendFunctionCall(responder_handler, NULL, I2C_SUCCESS, pdMS_TO_TICKS(0));
+  //xTimerPendFunctionCall(responder_handler, NULL, I2C_SUCCESS, pdMS_TO_TICKS(0));
+  i2c2_set_address_callback(comm_stack_responder_listen_handler);
 }
 
 void exec_external_command(protocol_message_t command_packet)

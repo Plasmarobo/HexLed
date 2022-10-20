@@ -13,7 +13,9 @@
         "comm_stack.h": "c",
         "semphr.h": "c",
         "stm32l0xx_hal_conf.h": "c",
-        "i2c.h": "c"
+        "i2c.h": "c",
+        "priorities.h": "c",
+        "display.h": "c"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools"
 }

@@ -23,5 +23,6 @@ int     clear_channel(opt_callback_t cb);
 uint8_t get_selected_channel(void);
 int     update_channel_status(opt_callback_t cb);
 uint8_t get_channel_status(void);
+void    reset_tca9544apwr_driver(void);
 
 #endif /* TCA9544APWR_H */

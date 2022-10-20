@@ -128,6 +128,7 @@ void StartDefaultTask(void *argument)
   for(;;)
   {
     update_application();
+    portYIELD();
   }
   /* USER CODE END StartDefaultTask */
 }

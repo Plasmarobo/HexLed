@@ -15,7 +15,7 @@
 static uint8_t        selected_channel;
 static uint8_t        control_reg;
 static uint8_t        cmd;
-static opt_callback_t cb_cache;
+volatile opt_callback_t cb_cache;
 
 // Private functions
 void mp_i2c_callback(int32_t err, uintptr_t userdata)
@@ -58,7 +58,7 @@ int set_channel(comm_port_t channel, opt_callback_t cb)
     selected_channel = channel;
     return i2c1_send(MULTIPLEXER_ADDRESS, &cmd, CONTROL_REG_LENGTH, mp_i2c_callback);
   }
-  return 0;
+  return I2C_BUSY;
 }
 
 int clear_channel(opt_callback_t cb)
@@ -69,7 +69,7 @@ int clear_channel(opt_callback_t cb)
     cb_cache         = cb;
     return i2c1_send(MULTIPLEXER_ADDRESS, &selected_channel, CONTROL_REG_LENGTH, mp_i2c_callback);
   }
-  return 0;
+  return I2C_BUSY;
 }
 
 uint8_t get_selected_channel(void)
@@ -84,11 +84,17 @@ int update_channel_status(opt_callback_t cb)
     cb_cache = cb;
     return i2c1_receive(MULTIPLEXER_ADDRESS, &control_reg, CONTROL_REG_LENGTH, mp_i2c_callback);
   }
-  return 0;
+  return I2C_BUSY;
 }
 
 uint8_t get_channel_status(void)
 {
   // We only care about channels 0, 1, and 2
   return control_reg & CHANNEL_STATUS_MASK;
+}
+
+void reset_tca9544apwr_driver(void)
+{
+  cb_cache         = NULL;
+  selected_channel = 0;
 }

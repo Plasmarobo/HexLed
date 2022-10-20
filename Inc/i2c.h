@@ -45,6 +45,7 @@ extern "C"
 #define I2C_SUCCESS (0)
 #define I2C_TIMEOUT (-1)
 #define I2C_ERROR (-2)
+#define I2C_BUSY (-3)
 
 typedef void (*address_callback_t)(uint8_t, uint16_t);
 

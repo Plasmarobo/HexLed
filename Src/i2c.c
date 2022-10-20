@@ -33,20 +33,12 @@
 
 #define I2C_DEFAULT_TIMEOUT (250)
 
-TimerHandle_t i2c1_timer_id;
-TimerHandle_t i2c2_timer_id;
-StaticTimer_t i2c1_timer;
-StaticTimer_t i2c2_timer;
-
 static opt_callback_t     i2c1_rx_callback;
 static opt_callback_t     i2c1_tx_callback;
 static opt_callback_t     i2c2_rx_callback;
 static opt_callback_t     i2c2_tx_callback;
 static address_callback_t i2c2_address_callback;
 static opt_callback_t     i2c2_listen_callback;
-
-static void i2c1_handle_timeout(TimerHandle_t tm);
-static void i2c2_handle_timeout(TimerHandle_t tm);
 
 /* USER CODE END 0 */
 
@@ -77,7 +69,7 @@ void MX_I2C1_Init(void)
   hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
   hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
   hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  //hi2c1.State                 = HAL_I2C_STATE_RESET;
+  hi2c1.State                 = HAL_I2C_STATE_RESET;
   if (HAL_I2C_Init(&hi2c1) != HAL_OK)
   {
     Error_Handler();
@@ -113,7 +105,7 @@ void MX_I2C2_Init(void)
   /* USER CODE END I2C2_Init 1 */
   hi2c2.Instance              = I2C2;
   hi2c2.Init.Timing           = 0x00200C2D;
-  hi2c2.Init.OwnAddress1      = (COMM_PROTOCOL_BASE_ADDRESS);
+  hi2c2.Init.OwnAddress1      = (COMM_PROTOCOL_BASE_ADDRESS << 1);
   hi2c2.Init.AddressingMode   = I2C_ADDRESSINGMODE_7BIT;
   hi2c2.Init.DualAddressMode  = I2C_DUALADDRESS_DISABLE;
   hi2c2.Init.OwnAddress2      = 0;
@@ -216,8 +208,7 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* i2cHandle)
     HAL_NVIC_SetPriority(I2C1_IRQn, 3, 0);
     HAL_NVIC_EnableIRQ(I2C1_IRQn);
     /* USER CODE BEGIN I2C1_MspInit 1 */
-    i2c1_timer_id =
-        xTimerCreateStatic("i2c1_timer", pdMS_TO_TICKS(I2C_DEFAULT_TIMEOUT), pdFALSE, 0, i2c1_handle_timeout, &i2c1_timer);
+
     /* USER CODE END I2C1_MspInit 1 */
   }
   else if(i2cHandle->Instance==I2C2)
@@ -233,7 +224,7 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* i2cHandle)
     */
     GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_11;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Pull      = GPIO_PULLUP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF6_I2C2;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -282,8 +273,7 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* i2cHandle)
     HAL_NVIC_SetPriority(I2C2_IRQn, 3, 0);
     HAL_NVIC_EnableIRQ(I2C2_IRQn);
     /* USER CODE BEGIN I2C2_MspInit 1 */
-    i2c2_timer_id =
-        xTimerCreateStatic("i2c2_timer", pdMS_TO_TICKS(I2C_DEFAULT_TIMEOUT), pdFALSE, 0, i2c2_handle_timeout, &i2c2_timer);
+
     /* USER CODE END I2C2_MspInit 1 */
   }
 }
@@ -348,9 +338,13 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* i2cHandle)
 /* USER CODE BEGIN 1 */
 void HAL_I2C_AddrCallback(I2C_HandleTypeDef* hi2c, uint8_t direction, uint16_t address_match_code)
 {
-  if ((hi2c == &hi2c2) && (NULL != i2c2_address_callback))
+  if (hi2c == &hi2c2)
   {
-    i2c2_address_callback(direction, address_match_code);
+    HAL_I2C_DisableListen_IT(hi2c);
+    if (NULL != i2c2_address_callback)
+    {
+      i2c2_address_callback(direction, address_match_code >> 1);
+    }
   }
 }
 
@@ -358,10 +352,7 @@ void HAL_I2C_ListenCpltCallback(I2C_HandleTypeDef* hi2c)
 {
   if (hi2c == &hi2c2)
   {
-    if (HAL_OK != HAL_I2C_EnableListen_IT(hi2c))
-    {
-      assert(0);
-    }
+    HAL_I2C_EnableListen_IT(hi2c);
   }
 }
 
@@ -369,7 +360,6 @@ void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
   if (hi2c == &hi2c1)
   {
-    xTimerStop(i2c1_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c1_tx_callback)
     {
       i2c1_tx_callback(I2C_SUCCESS, 0);
@@ -378,7 +368,6 @@ void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
   }
   else if (hi2c == &hi2c2)
   {
-    xTimerStop(i2c2_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c2_tx_callback)
     {
       i2c2_tx_callback(I2C_SUCCESS, 0);
@@ -391,7 +380,6 @@ void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
   if (hi2c == &hi2c1)
   {
-    xTimerStop(i2c1_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c1_rx_callback)
     {
       i2c1_rx_callback(I2C_SUCCESS, 0);
@@ -400,7 +388,6 @@ void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
   }
   else if (hi2c == &hi2c2)
   {
-    xTimerStop(i2c2_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c2_rx_callback)
     {
       i2c2_rx_callback(I2C_SUCCESS, 0);
@@ -413,7 +400,6 @@ void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
   if (hi2c == &hi2c1)
   {
-    xTimerStop(i2c1_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c1_tx_callback)
     {
       i2c1_tx_callback(I2C_SUCCESS, 0);
@@ -422,7 +408,6 @@ void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c)
   }
   else if (hi2c == &hi2c2)
   {
-    xTimerStop(i2c2_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c2_tx_callback)
     {
       i2c2_tx_callback(I2C_SUCCESS, 0);
@@ -435,7 +420,6 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef* hi2c)
 {
   if (hi2c == &hi2c1)
   {
-    xTimerStop(i2c1_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c1_rx_callback)
     {
       i2c1_rx_callback(I2C_SUCCESS, 0);
@@ -444,7 +428,6 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef* hi2c)
   }
   else if (hi2c == &hi2c2)
   {
-    xTimerStop(i2c2_timer_id, pdMS_TO_TICKS(0));
     if (NULL != i2c2_rx_callback)
     {
       i2c2_rx_callback(I2C_SUCCESS, 0);
@@ -455,29 +438,51 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef* hi2c)
 
 void HAL_I2C_ErrorCallback(I2C_HandleTypeDef* hi2c)
 {
+  if (hi2c == &hi2c1)
+  {
+    if (NULL != i2c1_tx_callback)
+    {
+      i2c1_tx_callback(hi2c->ErrorCode, 0);
+    }
+    if (NULL != i2c1_rx_callback)
+    {
+      i2c1_rx_callback(hi2c->ErrorCode, 0);
+    }
+  }
   if (hi2c == &hi2c2)
   {
-    if (HAL_OK != HAL_I2C_EnableListen_IT(hi2c))
+    // IF the master doesn't send as many bytse as we expect,
+    // we will throw a tantrum in the form of an AF error.
+    // Check if the interface is busy, if it is not, ignore the
+    // error and assume the message is in storage
+    int i2c_status = hi2c->ErrorCode;
+    if ((hi2c->ErrorCode == HAL_I2C_ERROR_AF) && (hi2c->State != HAL_I2C_STATE_BUSY))
     {
-      assert(0);
+      // Override error code: we just have a shorter message than maximum
+      i2c_status = I2C_SUCCESS;
     }
+    if (NULL != i2c2_tx_callback)
+    {
+      i2c2_tx_callback(i2c_status, 0);
+    }
+    if (NULL != i2c2_rx_callback)
+    {
+      i2c2_rx_callback(i2c_status, 0);
+    }
+    HAL_I2C_EnableListen_IT(hi2c);
   }
 }
 
 int i2c1_send(uint16_t address, uint8_t* buffer, uint32_t length, opt_callback_t cb)
 {
   int result = I2C_SUCCESS;
-  if (NULL != i2c1_timer_id)
+  if (HAL_OK == HAL_I2C_Master_Transmit_DMA(&hi2c1, address, buffer, length))
   {
-    if (HAL_OK == HAL_I2C_Master_Transmit_DMA(&hi2c1, address, buffer, length))
-    {
-      xTimerStart(i2c1_timer_id, pdMS_TO_TICKS(0));
-      i2c1_tx_callback = cb;
-    }
-    else
-    {
-      result = I2C_ERROR;
-    }
+    i2c1_tx_callback = cb;
+  }
+  else
+  {
+    result = I2C_ERROR;
   }
   return result;
 }
@@ -485,17 +490,13 @@ int i2c1_send(uint16_t address, uint8_t* buffer, uint32_t length, opt_callback_t
 int i2c2_send(uint8_t* buffer, uint32_t length, opt_callback_t cb)
 {
   int result = I2C_SUCCESS;
-  if (NULL != i2c2_timer_id)
+  if (HAL_OK == HAL_I2C_Slave_Transmit_DMA(&hi2c2, buffer, length))
   {
-    if (HAL_OK == HAL_I2C_Slave_Transmit_DMA(&hi2c2, buffer, length))
-    {
-      xTimerStart(i2c2_timer_id, pdMS_TO_TICKS(0));
-      i2c2_tx_callback = cb;
-    }
-    else
-    {
-      result = I2C_ERROR;
-    }
+    i2c2_tx_callback = cb;
+  }
+  else
+  {
+    result = I2C_ERROR;
   }
   return result;
 }
@@ -503,17 +504,13 @@ int i2c2_send(uint8_t* buffer, uint32_t length, opt_callback_t cb)
 int i2c1_receive(uint16_t address, uint8_t* buffer, uint32_t max_length, opt_callback_t cb)
 {
   int result = I2C_SUCCESS;
-  if (NULL != i2c1_timer_id)
+  if (HAL_OK == HAL_I2C_Master_Receive_DMA(&hi2c1, address, buffer, max_length))
   {
-    if (HAL_OK == HAL_I2C_Master_Receive_DMA(&hi2c1, address, buffer, max_length))
-    {
-      xTimerStart(i2c1_timer_id, pdMS_TO_TICKS(0));
-      i2c1_rx_callback = cb;
-    }
-    else
-    {
-      result = I2C_ERROR;
-    }
+    i2c1_rx_callback = cb;
+  }
+  else
+  {
+    result = I2C_ERROR;
   }
   return result;
 }
@@ -521,64 +518,22 @@ int i2c1_receive(uint16_t address, uint8_t* buffer, uint32_t max_length, opt_cal
 int i2c2_receive(uint8_t* buffer, uint32_t max_length, opt_callback_t cb)
 {
   int result = I2C_SUCCESS;
-  if (NULL != i2c2_timer_id)
+  if (HAL_OK == HAL_I2C_Slave_Receive_DMA(&hi2c2, buffer, max_length))
   {
-    if (HAL_OK == HAL_I2C_Slave_Receive_DMA(&hi2c2, buffer, max_length))
-    {
-      xTimerStart(i2c2_timer_id, pdMS_TO_TICKS(0));
-      i2c2_rx_callback = cb;
-    }
-    else
-    {
-      result = I2C_ERROR;
-    }
+    i2c2_rx_callback = cb;
+  }
+  else
+  {
+    result = I2C_ERROR;
   }
   return result;
-}
-
-void i2c1_handle_timeout(TimerHandle_t tm)
-{
-  UNUSED(tm);
-  // Abort DMA and report timeout
-  HAL_I2C_DMAStop(&hi2c1);
-  if (NULL != i2c1_tx_callback)
-  {
-    i2c1_tx_callback(I2C_TIMEOUT, 0);
-  }
-  if (NULL != i2c1_rx_callback)
-  {
-    i2c1_rx_callback(I2C_TIMEOUT, 0);
-  }
-}
-
-void i2c2_handle_timeout(TimerHandle_t tm)
-{
-  UNUSED(tm);
-  // Abort DMA and report timeout
-  HAL_I2C_DMAStop(&hi2c2);
-  if (NULL != i2c2_tx_callback)
-  {
-    i2c2_tx_callback(I2C_TIMEOUT, 0);
-  }
-  if (NULL != i2c2_rx_callback)
-  {
-    i2c2_rx_callback(I2C_TIMEOUT, 0);
-  }
-  // Restore listen mode
-  if (HAL_OK != HAL_I2C_EnableListen_IT(&hi2c2))
-  {
-    assert(0);
-  }
 }
 
 void i2c2_set_address_callback(address_callback_t cb)
 {
   i2c2_address_callback = cb;
   // Enable the liste interrupt
-  if (HAL_OK != HAL_I2C_EnableListen_IT(&hi2c2))
-  {
-    assert(0);
-  }
+  HAL_I2C_EnableListen_IT(&hi2c2);
 }
 
 void i2c2_set_listen_callback(opt_callback_t cb)

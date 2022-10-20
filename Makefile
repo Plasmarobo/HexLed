@@ -15,7 +15,6 @@
 ######################################
 TARGET = HexLed
 
-
 ######################################
 # building variables
 ######################################
@@ -92,7 +91,6 @@ Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM0/port.c
 ASM_SOURCES =  \
 startup_stm32l071xx.s
 
-
 #######################################
 # binaries
 #######################################
@@ -135,7 +133,8 @@ AS_DEFS =
 C_DEFS =  \
 -DUSE_HAL_DRIVER \
 -DSTM32L071xx \
--DDEBUG
+-DDEBUG \
+-DHW_VERSION=4
 
 # AS includes
 AS_INCLUDES =  \

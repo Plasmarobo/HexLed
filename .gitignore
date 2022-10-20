@@ -1,3 +1,7 @@
 build/
 .vscode/**
 *.bak
+Experiments/I2CSlave/Drivers/
+*.log
+*.d
+*.bak

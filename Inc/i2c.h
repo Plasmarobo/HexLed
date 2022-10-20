@@ -63,6 +63,9 @@ int i2c2_receive(uint8_t* buffer, uint32_t max_length, opt_callback_t cb);
 
 void i2c2_set_address_callback(address_callback_t cb);
 void i2c2_set_listen_callback(opt_callback_t cb);
+
+void i2c1_generate_nak(void);
+void i2c2_generate_nak(void);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

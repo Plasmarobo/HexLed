@@ -107,9 +107,9 @@ void MX_I2C2_Init(void)
   hi2c2.Init.Timing           = 0x00200C2D;
   hi2c2.Init.OwnAddress1      = (COMM_PROTOCOL_BASE_ADDRESS << 1);
   hi2c2.Init.AddressingMode   = I2C_ADDRESSINGMODE_7BIT;
-  hi2c2.Init.DualAddressMode  = I2C_DUALADDRESS_DISABLE;
-  hi2c2.Init.OwnAddress2      = 0;
-  hi2c2.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c2.Init.DualAddressMode  = I2C_DUALADDRESS_ENABLE;
+  hi2c2.Init.OwnAddress2      = (COMM_PROTOCOL_ADDRESS_TWO << 1);
+  hi2c2.Init.OwnAddress2Masks = I2C_OA2_MASK01; // Mask out the lowest bit (twos bit if you include r/w)
   hi2c2.Init.GeneralCallMode  = I2C_GENERALCALL_DISABLE;
   hi2c2.Init.NoStretchMode    = I2C_NOSTRETCH_DISABLE;
   hi2c2.State = HAL_I2C_STATE_RESET;
@@ -224,7 +224,7 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* i2cHandle)
     */
     GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_11;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-    GPIO_InitStruct.Pull      = GPIO_PULLUP;
+    GPIO_InitStruct.Pull      = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF6_I2C2;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -350,10 +350,7 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef* hi2c, uint8_t direction, uint16_t a
 
 void HAL_I2C_ListenCpltCallback(I2C_HandleTypeDef* hi2c)
 {
-  if (hi2c == &hi2c2)
-  {
-    HAL_I2C_EnableListen_IT(hi2c);
-  }
+  HAL_I2C_EnableListen_IT(hi2c);
 }
 
 void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
@@ -413,6 +410,7 @@ void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c)
       i2c2_tx_callback(I2C_SUCCESS, 0);
       i2c2_tx_callback = NULL;
     }
+    HAL_I2C_EnableListen_IT(hi2c);
   }
 }
 
@@ -432,6 +430,7 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef* hi2c)
     {
       i2c2_rx_callback(I2C_SUCCESS, 0);
       i2c2_rx_callback = NULL;
+      HAL_I2C_EnableListen_IT(hi2c);
     }
   }
 }
@@ -451,7 +450,7 @@ void HAL_I2C_ErrorCallback(I2C_HandleTypeDef* hi2c)
   }
   if (hi2c == &hi2c2)
   {
-    // IF the master doesn't send as many bytse as we expect,
+    // IF the master doesn't send as many bytes as we expect,
     // we will throw a tantrum in the form of an AF error.
     // Check if the interface is busy, if it is not, ignore the
     // error and assume the message is in storage
@@ -539,6 +538,16 @@ void i2c2_set_address_callback(address_callback_t cb)
 void i2c2_set_listen_callback(opt_callback_t cb)
 {
   i2c2_listen_callback = cb;
+}
+
+void i2c1_generate_nak(void)
+{
+  __HAL_I2C_GENERATE_NACK(&hi2c1);
+}
+
+void i2c2_generate_nak(void)
+{
+  __HAL_I2C_GENERATE_NACK(&hi2c2);
 }
 
 /* USER CODE END 1 */

@@ -15,7 +15,9 @@
         "stm32l0xx_hal_conf.h": "c",
         "i2c.h": "c",
         "priorities.h": "c",
-        "display.h": "c"
+        "display.h": "c",
+        "tca9544apwr.h": "c",
+        "comm_protocol.h": "c"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools"
 }

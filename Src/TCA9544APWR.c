@@ -5,6 +5,7 @@
 #include "i2c.h"
 #include "opt_prototypes.h"
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #define CONTROL_REG_LENGTH (1)
@@ -93,8 +94,30 @@ uint8_t get_channel_status(void)
   return control_reg & CHANNEL_STATUS_MASK;
 }
 
+bool is_channel_active(comm_port_t port)
+{
+  bool active = false;
+  switch (port)
+  {
+    case COMM_PORT_A:
+      active = (control_reg & CHANNEL0_STATUS) != 0;
+      break;
+    case COMM_PORT_B:
+      active = (control_reg & CHANNEL1_STATUS) != 0;
+      break;
+    case COMM_PORT_C:
+      active = (control_reg & CHANNEL2_STATUS) != 0;
+      break;
+    default:
+      break;
+  }
+  return active;
+}
+
 void reset_tca9544apwr_driver(void)
 {
   cb_cache         = NULL;
   selected_channel = 0;
+  // Abort any transfer
+  i2c1_generate_nak();
 }

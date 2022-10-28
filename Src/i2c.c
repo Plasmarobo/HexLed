@@ -545,6 +545,40 @@ void i2c1_generate_nak(void)
   __HAL_I2C_GENERATE_NACK(&hi2c1);
 }
 
+void i2c1_abort(void)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = { 0 };
+  HAL_I2C_DMAStop(&hi2c1);
+  HAL_I2C_DeInit(&hi2c1); // Release pins, reset handle status flag
+
+  __HAL_RCC_I2C2_FORCE_RESET();
+  __HAL_RCC_I2C2_RELEASE_RESET();
+
+  GPIO_InitStruct.Pin   = GPIO_PIN_9 | GPIO_PIN_10; // This line is original
+  GPIO_InitStruct.Mode  = GPIO_MODE_OUTPUT_PP;      // GPIO is configured as output
+  GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;          // Strong pull up
+
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  // Drive SCL Low
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET);
+  // Drive SDA High
+  vTaskDelay(10);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET);
+  vTaskDelay(20);
+  for (uint8_t i = 0; i < 12; ++i)
+  {
+    // Clock out 12 cycles to clear bus
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_RESET);
+    vTaskDelay(10);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_SET);
+    vTaskDelay(10);
+  }
+  // Re-enable I2C
+  HAL_I2C_Init(&hi2c1);
+}
+
 void i2c2_generate_nak(void)
 {
   __HAL_I2C_GENERATE_NACK(&hi2c2);

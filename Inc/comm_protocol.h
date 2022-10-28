@@ -48,8 +48,7 @@ typedef enum
 
 typedef struct
 {
-  comm_port_t        target_port;
-  device_id_t        target_address;
+  device_id_t        destination_address;
   protocol_message_t message;
 } network_message_t;
 

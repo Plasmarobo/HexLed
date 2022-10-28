@@ -69,8 +69,6 @@ void i2c2_generate_nak(void);
 
 void i2c1_abort(void);
 void i2c2_abort(void);
-
-void
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

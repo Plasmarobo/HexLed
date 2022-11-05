@@ -1,6 +1,8 @@
 #ifndef COMM_PROTOCOL_H
 #define COMM_PROTOCOL_H
 
+#include "opt_prototypes.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -34,6 +36,12 @@ typedef struct
   uint8_t data[COMM_PROTOCOL_MAX_MESSAGE_LENGTH];
 } protocol_message_t;
 
+typedef struct
+{
+  protocol_message_t message;
+  opt_callback_t     callback;
+} protocol_operation_t;
+
 typedef enum
 {
   COMM_PORT_A           = 0,
@@ -45,12 +53,6 @@ typedef enum
   COMM_PORT_ALL         = 5,
   COMM_PORT_MULTIPLEXER = 6,
 } comm_port_t;
-
-typedef struct
-{
-  device_id_t        destination_address;
-  protocol_message_t message;
-} network_message_t;
 
 typedef enum
 {
@@ -64,27 +66,7 @@ typedef enum
   RESPONSE_ERROR_NOT_IMPLEMENTED,
   RESPONSE_ERROR_ID_UNKNOWN,
   RESPONSE_CONFIGURATION_REQUIRED,
-  // Command 0x80 - 0xFF
-  // SYSTEM
-  COMMAND_GET_ID = 0x80,
-  COMMAND_SET_ID,
-  COMMAND_RESET,
-  COMMAND_TIME_SYNC,
-  COMMAND_WHOAMI,
-  // LED
-  COMMAND_SET_LED,
-  COMMAND_SET_ALL_LEDS,
-  COMMAND_SET_PATTERN,
-  // NETWORK
-  COMMAND_LIST_CONNECTED,
-  COMMAND_TRACEROUTE,
-  COMMAND_SEND_TO,
-  COMMAND_CLEAR_ROUTING_TABLE,
-  COMMAND_SET_LOCATION,
-  COMMAND_UPDATE_LOCATION,
-  // DATA
-  COMMAND_READ_MESSAGE,
-  COMMAND_WRITE_MESSAGE,
+  RESPONSE_UNKNOWN_ERROR,
 } header_data_t;
 
 void        set_device_id(device_id_t id);

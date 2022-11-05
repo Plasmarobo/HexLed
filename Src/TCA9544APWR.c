@@ -119,5 +119,5 @@ void reset_tca9544apwr_driver(void)
   cb_cache         = NULL;
   selected_channel = 0;
   // Abort any transfer
-  i2c1_generate_nak();
+  i2c1_abort();
 }

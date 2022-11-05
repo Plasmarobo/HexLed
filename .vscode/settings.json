@@ -17,7 +17,8 @@
         "priorities.h": "c",
         "display.h": "c",
         "tca9544apwr.h": "c",
-        "comm_protocol.h": "c"
+        "comm_protocol.h": "c",
+        "network_stack.h": "c"
     },
     "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools"
 }

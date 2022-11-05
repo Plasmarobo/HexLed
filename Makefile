@@ -40,6 +40,7 @@ Src/stm32l0xx_hal_timebase_tim.c \
 Src/application.c \
 Src/gpio.c \
 Src/dma.c \
+Src/device_ops.c \
 Src/i2c.c \
 Src/iwdg.c \
 Src/rtc.c \
@@ -54,6 +55,7 @@ Src/comm_protocol.c \
 Src/serial_output.c \
 Src/fast_hsv2rgb_32bit.c \
 Src/TCA9544APWR.c \
+Src/network_stack.c \
 Drivers/STM32L0xx_HAL_Driver/Src/stm32l0xx_hal.c \
 Drivers/STM32L0xx_HAL_Driver/Src/stm32l0xx_hal_i2c.c \
 Drivers/STM32L0xx_HAL_Driver/Src/stm32l0xx_hal_i2c_ex.c \
@@ -135,6 +137,14 @@ C_DEFS =  \
 -DSTM32L071xx \
 -DDEBUG \
 -DHW_VERSION=4
+
+SOURCE_PATHS = \
+common \
+middlewares \
+
+
+
+
 
 # AS includes
 AS_INCLUDES =  \

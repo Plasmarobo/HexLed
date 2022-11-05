@@ -61,10 +61,10 @@ int i2c2_send(uint8_t* buffer, uint32_t length, opt_callback_t cb);
 int i2c1_receive(uint16_t address, uint8_t* buffer, uint32_t max_length, opt_callback_t cb);
 int i2c2_receive(uint8_t* buffer, uint32_t max_length, opt_callback_t cb);
 
+void i2c2_listen(void);
 void i2c2_set_address_callback(address_callback_t cb);
 void i2c2_set_listen_callback(opt_callback_t cb);
 
-void i2c1_generate_nak(void);
 void i2c2_generate_nak(void);
 
 void i2c1_abort(void);

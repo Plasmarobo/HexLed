@@ -31,8 +31,6 @@
 #include "assert.h"
 #include "stm32l0xx_hal.h"
 
-#define I2C_DEFAULT_TIMEOUT (250)
-
 static opt_callback_t     i2c1_rx_callback;
 static opt_callback_t     i2c1_tx_callback;
 static opt_callback_t     i2c2_rx_callback;
@@ -410,7 +408,6 @@ void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c)
       i2c2_tx_callback(I2C_SUCCESS, 0);
       i2c2_tx_callback = NULL;
     }
-    HAL_I2C_EnableListen_IT(hi2c);
   }
 }
 
@@ -430,7 +427,6 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef* hi2c)
     {
       i2c2_rx_callback(I2C_SUCCESS, 0);
       i2c2_rx_callback = NULL;
-      HAL_I2C_EnableListen_IT(hi2c);
     }
   }
 }
@@ -460,6 +456,10 @@ void HAL_I2C_ErrorCallback(I2C_HandleTypeDef* hi2c)
       // Override error code: we just have a shorter message than maximum
       i2c_status = I2C_SUCCESS;
     }
+    else
+    {
+      __HAL_I2C_GENERATE_NACK(&hi2c2);
+    }
     if (NULL != i2c2_tx_callback)
     {
       i2c2_tx_callback(i2c_status, 0);
@@ -468,7 +468,6 @@ void HAL_I2C_ErrorCallback(I2C_HandleTypeDef* hi2c)
     {
       i2c2_rx_callback(i2c_status, 0);
     }
-    HAL_I2C_EnableListen_IT(hi2c);
   }
 }
 
@@ -528,11 +527,14 @@ int i2c2_receive(uint8_t* buffer, uint32_t max_length, opt_callback_t cb)
   return result;
 }
 
+void i2c2_listen(void)
+{
+  HAL_I2C_EnableListen_IT(&hi2c2);
+}
+
 void i2c2_set_address_callback(address_callback_t cb)
 {
   i2c2_address_callback = cb;
-  // Enable the liste interrupt
-  HAL_I2C_EnableListen_IT(&hi2c2);
 }
 
 void i2c2_set_listen_callback(opt_callback_t cb)
@@ -540,9 +542,9 @@ void i2c2_set_listen_callback(opt_callback_t cb)
   i2c2_listen_callback = cb;
 }
 
-void i2c1_generate_nak(void)
+void i2c2_generate_nak(void)
 {
-  __HAL_I2C_GENERATE_NACK(&hi2c1);
+  __HAL_I2C_GENERATE_NACK(&hi2c2);
 }
 
 void i2c1_abort(void)
@@ -601,11 +603,6 @@ void i2c2_abort(void)
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
   // Re-enable I2C
   HAL_I2C_Init(&hi2c1);
-}
-
-void i2c2_generate_nak(void)
-{
-  __HAL_I2C_GENERATE_NACK(&hi2c2);
 }
 
 /* USER CODE END 1 */
